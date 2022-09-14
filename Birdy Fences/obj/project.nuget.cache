@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "8BG0d1mi7JIc93kmB2NQhecAfHfE3mv7BJJKPkuziDhon6/jfG9UcE0bnJIK2qPTwMsnkhStE+Ry23Rwy9xYNQ==",
+  "success": true,
+  "projectFilePath": "C:\\Users\\ASUS PC\\Documents\\Visual Studio 2022\\Projects\\Birdy Fences\\Birdy Fences\\Birdy Fences.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\ASUS PC\\.nuget\\packages\\newtonsoft.json\\13.0.1\\newtonsoft.json.13.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}
