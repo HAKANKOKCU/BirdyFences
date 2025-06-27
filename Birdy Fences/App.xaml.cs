@@ -196,7 +196,11 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     {
                         if (icon["DisplayIcon"] == null)
                         {
-                            ico.Source = System.Drawing.Icon.ExtractAssociatedIcon((string)icon["Filename"]).ToImageSource();
+                            var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon((string)icon["Filename"]);
+                            if (extractedIcon != null)
+                            {
+                                ico.Source = extractedIcon.ToImageSource();
+                            }
                         }
                         else
                         {
@@ -353,9 +357,12 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 win.Show();
                 win.Loaded += (sender,e) => SetWindowLong(new WindowInteropHelper(win).Handle, GWL_HWNDPARENT, hprog);
             }
-            foreach (dynamic fence in fencedata)
+            if (fencedata != null)
             {
-                createFence(fence);
+                foreach (dynamic fence in fencedata)
+                {
+                    createFence(fence);
+                }
             }
         }
     }
