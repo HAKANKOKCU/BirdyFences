@@ -8,7 +8,6 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>True</UseWindowsForms>
     <ApplicationIcon>Resources\favicon.ico</ApplicationIcon>
-    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
