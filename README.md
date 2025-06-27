@@ -8,11 +8,11 @@ BirdyFences is alternative to the StarDock's Fences
 # How to
 Just open the exe to get started.
 
-To create a new fence, right click on the Title of the fence, then New Fence
-To remove a fence, right click again in the Title of the fence, then Remove Fence
-To create a Portal Fence, right click again in the Title of the fence then New Portal Fence, and select a folder to import all shortcuts
-To Lock/Unlock a fence, right click on the Title of the fence, then Lock Fence
-To edit title of the fence, double click on the title, then type the new title and press Enter
+- To create a new fence, right click on the Title of the fence, then New Fence
+- To remove a fence, right click again in the Title of the fence, then Remove Fence
+- To create a Portal Fence, right click again in the Title of the fence then New Portal Fence, and select a folder to import all shortcuts
+- To Lock/Unlock a fence, right click on the Title of the fence, then Lock Fence
+- To edit title of the fence, double click on the title, then type the new title and press Enter
 
 To automatically start when boot:
 - Windows 11: Right Click into the exe file then `Show more options` then `Send to` and click `Desktop (Create Shortcut)`
