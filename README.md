@@ -1,4 +1,6 @@
 # BirdyFences
+![birdyfences_sm](https://github.com/user-attachments/assets/ac577965-9f2f-483a-9bfd-4281b199ec73)
+
 BirdyFences is alternative to the StarDock's Fences
 
 ![resim](https://user-images.githubusercontent.com/103432992/190169653-c00308b4-afb1-407b-b1e6-be29d8ac5ecc.png)
