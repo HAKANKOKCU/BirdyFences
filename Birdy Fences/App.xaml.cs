@@ -59,11 +59,13 @@ namespace Birdy_Fences
                 File.WriteAllText(userdir + "\\Birdy Fences\\WELCOME.txt", @"Welcome to Birdy Fences!
 
 This is a simple application that allows you to create fences on your desktop to organize your files and folders.
-The Fences are draggable and sizable to help you organize.
+The Fences are draggable and sizable to help you organize. Drag and drop files and folders into the fences to add them.
 
 To create a new fence, right click on the Title of the fence, then New Fence
 To remove a fence, right click again in the Title of the fence, then Remove Fence
 To create a Portal Fence, right click again in the Title of the fence then New Portal Fence, and select a folder to import all shortcuts
+To Lock/Unlock a fence, right click on the Title of the fence, then Lock Fence
+To edit title of the fence, double click on the title, then type the new title and press Enter
 
 Terminologies:
 Portal Fence - are files and shortcuts that exists on the selected Portal Folder");
