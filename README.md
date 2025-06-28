@@ -21,5 +21,8 @@ To automatically start when boot:
 - Drag the `Birdy Fences - Shortcut` to the shell:startup file explorer
 - And reboot to check if its working.
 
+# WIP
+- Add icons for folders (for now icons for folder appear as nothing)
+
 # Thanks
 Thanks to [HAKANKOKCU](https://github.com/HAKANKOKCU/BirdyFences) for creating this app
