@@ -82,6 +82,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = isLocked };
                 cm.Items.Add(miLF);
                 Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence["Title"], ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize, Width = fence["Width"], Height = fence["Height"], Top = fence["Y"], Left = fence["X"] };
+                HideAltTab.WindowHelper.HideFromAltTab(win);
                 miLF.Click += (sender, e) =>
                 {
                     // Toggle fence lock: disables/enables resizing the fence
@@ -385,6 +386,37 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
             }
 
             return wpfBitmap;
+        }
+    }
+
+    internal static class HideAltTab
+    {
+        public static class WindowHelper
+        {
+            private const int GWL_EXSTYLE = -20;
+            private const int WS_EX_TOOLWINDOW = 0x00000080;
+            private const int WS_EX_APPWINDOW = 0x00040000;
+
+            [DllImport("user32.dll")]
+            private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+            [DllImport("user32.dll")]
+            private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+            public static void HideFromAltTab(Window window)
+            {
+                window.SourceInitialized += (s, e) =>
+                {
+                    IntPtr hWnd = new WindowInteropHelper(window).Handle;
+                    int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+
+                    // Remove APPWINDOW style, add TOOLWINDOW style
+                    exStyle &= ~WS_EX_APPWINDOW;
+                    exStyle |= WS_EX_TOOLWINDOW;
+
+                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+                };
+            }
         }
     }
 }
