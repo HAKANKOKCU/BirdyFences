@@ -23,7 +23,7 @@ To automatically start when boot:
 
 # WIP
 - Add icons for folders (for now icons for folder appear as nothing)
-- Multi Desktop Support (As of now, it only supports one desktop)
+- Persistent Desktop Fences (for now fences are not persistent means when you switch desktop, fences are not visible)
 
 # Thanks
 Thanks to [HAKANKOKCU](https://github.com/HAKANKOKCU/BirdyFences) for creating this app
