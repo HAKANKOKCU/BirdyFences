@@ -82,7 +82,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = isLocked };
                 cm.Items.Add(miLF);
                 Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence["Title"], ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize, Width = fence["Width"], Height = fence["Height"], Top = fence["Y"], Left = fence["X"] };
-                HideAltTab.WindowHelper.HideFromAltTab(win);
+                HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
                 miLF.Click += (sender, e) =>
                 {
                     // Toggle fence lock: disables/enables resizing the fence
@@ -391,30 +391,34 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
 
     internal static class HideAltTab
     {
-        public static class WindowHelper
+        public static class VirtualDesktopHelper
         {
-            private const int GWL_EXSTYLE = -20;
-            private const int WS_EX_TOOLWINDOW = 0x00000080;
-            private const int WS_EX_APPWINDOW = 0x00040000;
+            [DllImport("user32.dll")]
+            static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
 
             [DllImport("user32.dll")]
-            private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+            static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
-            [DllImport("user32.dll")]
-            private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+            [DllImport("shell32.dll")]
+            static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
-            public static void HideFromAltTab(Window window)
+            const int GWL_EXSTYLE = -20;
+            const int WS_EX_TOOLWINDOW = 0x00000080;
+
+            public static void MakeWindowPersistent(Window window)
             {
                 window.SourceInitialized += (s, e) =>
                 {
-                    IntPtr hWnd = new WindowInteropHelper(window).Handle;
-                    int exStyle = GetWindowLong(hWnd, GWL_EXSTYLE);
+                    var helper = new WindowInteropHelper(window);
+                    IntPtr hWnd = helper.Handle;
 
-                    // Remove APPWINDOW style, add TOOLWINDOW style
-                    exStyle &= ~WS_EX_APPWINDOW;
+                    // Force a fake AppUserModelID (Windows uses this to link windows across desktops)
+                    SetCurrentProcessExplicitAppUserModelID("My.Persistent.Window");
+
+                    // Set TOOLWINDOW style (optional)
+                    var exStyle = (int)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
                     exStyle |= WS_EX_TOOLWINDOW;
-
-                    SetWindowLong(hWnd, GWL_EXSTYLE, exStyle);
+                    SetWindowLongPtr(hWnd, GWL_EXSTYLE, (IntPtr)exStyle);
                 };
             }
         }
