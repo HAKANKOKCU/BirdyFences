@@ -48,9 +48,23 @@ namespace Birdy_Fences
         {
             string userdir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             Directory.CreateDirectory(userdir + "\\Birdy Fences");
-            if (!File.Exists(userdir + "\\Birdy Fences\\fences.json"))
+            // fences.json exist but contains only []
+            if (!File.Exists(userdir + "\\Birdy Fences\\fences.json") || File.ReadAllText(userdir + "\\Birdy Fences\\fences.json").Trim() == "[]")
             {
-                File.WriteAllText(userdir + "\\Birdy Fences\\fences.json","[]");
+                File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", "[{\"Title\":\"Welcome to BirdyFences\",\"X\":500,\"Y\":500,\"Width\":500,\"Height\":200,\"ItemsType\":\"Data\",\"isLocked\":false,\"Items\":[{\"Filename\":\"" + userdir.Replace("\\", "\\\\") + "\\\\Birdy Fences\\\\WELCOME.txt\"}]}]");
+                File.WriteAllText(userdir + "\\Birdy Fences\\WELCOME.txt", @"Welcome to Birdy Fences!
+
+This is a simple application that allows you to create fences on your desktop to organize your files and folders.
+The Fences are draggable and sizable to help you organize. Drag and drop files and folders into the fences to add them.
+
+To create a new fence, right click on the Title of the fence, then New Fence
+To remove a fence, right click again in the Title of the fence, then Remove Fence
+To create a Portal Fence, right click again in the Title of the fence then New Portal Fence, and select a folder to import all shortcuts
+To Lock/Unlock a fence, right click on the Title of the fence, then Lock Fence
+To edit title of the fence, double click on the title, then type the new title and press Enter
+
+Terminologies:
+Portal Fence - are files and shortcuts that exists on the selected Portal Folder");
             }
             dynamic fencedata = Newtonsoft.Json.JsonConvert.DeserializeObject(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json"));
             void createFence(dynamic fence) {
@@ -63,7 +77,20 @@ namespace Birdy_Fences
                 cm.Items.Add(miNP);
                 MenuItem miRF = new() { Header = "Remove Fence" };
                 cm.Items.Add(miRF);
-                Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence["Title"], ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = ResizeMode.CanResize, Width = fence["Width"], Height = fence["Height"], Top = fence["Y"], Left = fence["X"] };
+                cm.Items.Add(new Separator());
+                bool isLocked = fence["isLocked"] != null && (bool)fence["isLocked"];
+                MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = isLocked };
+                cm.Items.Add(miLF);
+                Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence["Title"], ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize, Width = fence["Width"], Height = fence["Height"], Top = fence["Y"], Left = fence["X"] };
+                HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
+                miLF.Click += (sender, e) =>
+                {
+                    // Toggle fence lock: disables/enables resizing the fence
+                    isLocked = !isLocked;
+                    win.ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize;
+                    fence["isLocked"] = isLocked;
+                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                };
                 miRF.Click += (sender, e) => {
                     fence.Remove();
                     win.Close();
@@ -97,16 +124,9 @@ namespace Birdy_Fences
                 TextBox titletb = new() { HorizontalContentAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
                 dp.Children.Add(titletb);
                 titlelabel.MouseDown += (object sender, MouseButtonEventArgs e) => {
-                    //if (e.LeftButton == MouseButtonState.Pressed)
-                    //{
-                    //Point pos = new Point(System.Windows.Forms.Control.MousePosition.X, System.Windows.Forms.Control.MousePosition.Y);
-                    //pos = new Point(pos.X - Mouse.GetPosition(titlelabel).X, pos.Y - Mouse.GetPosition(titlelabel).Y);
-                    //win.Left = pos.X;
-                    //win.Top = pos.Y;
-                    //};
                     if (e.ClickCount == 1)
                     {
-                        if (e.LeftButton == MouseButtonState.Pressed)
+                        if (e.LeftButton == MouseButtonState.Pressed && !isLocked)
                         {
                             win.DragMove();
                         }
@@ -173,7 +193,11 @@ namespace Birdy_Fences
                     {
                         if (icon["DisplayIcon"] == null)
                         {
-                            ico.Source = System.Drawing.Icon.ExtractAssociatedIcon((string)icon["Filename"]).ToImageSource();
+                            var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon((string)icon["Filename"]);
+                            if (extractedIcon != null)
+                            {
+                                ico.Source = extractedIcon.ToImageSource();
+                            }
                         }
                         else
                         {
@@ -330,9 +354,12 @@ namespace Birdy_Fences
                 win.Show();
                 win.Loaded += (sender,e) => SetWindowLong(new WindowInteropHelper(win).Handle, GWL_HWNDPARENT, hprog);
             }
-            foreach (dynamic fence in fencedata)
+            if (fencedata != null)
             {
-                createFence(fence);
+                foreach (dynamic fence in fencedata)
+                {
+                    createFence(fence);
+                }
             }
         }
     }
@@ -359,6 +386,41 @@ namespace Birdy_Fences
             }
 
             return wpfBitmap;
+        }
+    }
+
+    internal static class HideAltTab
+    {
+        public static class VirtualDesktopHelper
+        {
+            [DllImport("user32.dll")]
+            static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+            [DllImport("user32.dll")]
+            static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+            [DllImport("shell32.dll")]
+            static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
+            const int GWL_EXSTYLE = -20;
+            const int WS_EX_TOOLWINDOW = 0x00000080;
+
+            public static void MakeWindowPersistent(Window window)
+            {
+                window.SourceInitialized += (s, e) =>
+                {
+                    var helper = new WindowInteropHelper(window);
+                    IntPtr hWnd = helper.Handle;
+
+                    // Force a fake AppUserModelID (Windows uses this to link windows across desktops)
+                    SetCurrentProcessExplicitAppUserModelID("My.Persistent.Window");
+
+                    // Set TOOLWINDOW style (optional)
+                    var exStyle = (int)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+                    exStyle |= WS_EX_TOOLWINDOW;
+                    SetWindowLongPtr(hWnd, GWL_EXSTYLE, (IntPtr)exStyle);
+                };
+            }
         }
     }
 }

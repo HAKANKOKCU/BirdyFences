@@ -10,14 +10,14 @@ namespace Birdy_Browser
 {
     internal class ClickEventAdder
     {
-        public event RoutedEventHandler Click;
+        public event RoutedEventHandler? Click;
 
         public ClickEventAdder(UIElement element) {
-            element.PreviewMouseLeftButtonUp += (sender, e) => Click(element, new RoutedEventArgs());
-            element.PreviewTouchUp += (sender, e) => Click(element, new RoutedEventArgs());
-            element.PreviewStylusUp += (sender, e) => Click(element, new RoutedEventArgs());
+            element.PreviewMouseLeftButtonUp += (sender, e) => Click?.Invoke(element, new RoutedEventArgs());
+            element.PreviewTouchUp += (sender, e) => Click?.Invoke(element, new RoutedEventArgs());
+            element.PreviewStylusUp += (sender, e) => Click?.Invoke(element, new RoutedEventArgs());
             element.Focusable = true;
-            element.PreviewKeyUp += (object sender,KeyEventArgs e) => { if (e.Key == Key.Enter) { Click(element, new RoutedEventArgs()); } };
+            element.PreviewKeyUp += (object sender,KeyEventArgs e) => { if (e.Key == Key.Enter) { Click?.Invoke(element, new RoutedEventArgs()); } };
         } 
     }
 }
