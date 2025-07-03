@@ -26,6 +26,5 @@ To automatically start when boot:
 
 # WIP
 - Add icons for folders (for now icons for folder appear as nothing)
-
-# Thanks
-Thanks to [HAKANKOKCU](https://github.com/HAKANKOKCU/BirdyFences) for creating this app
+- When locked, avoid removal of fence also prevent renaming the fence, right clock actions on shortcuts
+- When doing `WIN+D` avoid app to minimize as well
