@@ -83,6 +83,11 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 cm.Items.Add(miLF);
                 MenuItem miRF = new() { Header = "Remove Fence" };
                 cm.Items.Add(miRF);
+                cm.Items.Add(new Separator());
+                bool isLocked = fence["isLocked"] != null && (bool)fence["isLocked"];
+                MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = isLocked };
+                cm.Items.Add(miLF);
+
                 Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence["Title"], ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize, Width = fence["Width"], Height = fence["Height"], Top = fence["Y"], Left = fence["X"] };
                 HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
                 miLF.Click += (sender, e) =>
@@ -91,6 +96,12 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     isLocked = !isLocked;
                     win.ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize;
                     fence["isLocked"] = isLocked;
+
+                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                };
+                miRF.Click += (sender, e) => {
+                    fence.Remove();
+                    win.Close();
                     File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
                 };
                 miRF.Click += (sender, e) => {
@@ -441,5 +452,37 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
         }
     }
 }
+    {
+        public static class VirtualDesktopHelper
+        {
+            [DllImport("user32.dll")]
+            static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
 
+            [DllImport("user32.dll")]
+            static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+            [DllImport("shell32.dll")]
+            static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
+            const int GWL_EXSTYLE = -20;
+            const int WS_EX_TOOLWINDOW = 0x00000080;
+
+            public static void MakeWindowPersistent(Window window)
+            {
+                window.SourceInitialized += (s, e) =>
+                {
+                    var helper = new WindowInteropHelper(window);
+                    IntPtr hWnd = helper.Handle;
+
+                    // Force a fake AppUserModelID (Windows uses this to link windows across desktops)
+                    SetCurrentProcessExplicitAppUserModelID("My.Persistent.Window");
+
+                    // Set TOOLWINDOW style (optional)
+                    var exStyle = (int)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+                    exStyle |= WS_EX_TOOLWINDOW;
+                    SetWindowLongPtr(hWnd, GWL_EXSTYLE, (IntPtr)exStyle);
+                };
+            }
+        }
+    }
 }

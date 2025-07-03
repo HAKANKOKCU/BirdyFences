@@ -26,3 +26,5 @@ To automatically start when boot:
 
 # WIP
 - Add icons for folders (for now icons for folder appear as nothing)
+- When locked, avoid removal of fence also prevent renaming the fence, right clock actions on shortcuts
+- When doing `WIN+D` avoid app to minimize as well
