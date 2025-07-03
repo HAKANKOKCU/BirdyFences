@@ -1,22 +1,24 @@
-﻿using System;
+﻿using Birdy_Browser;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Configuration;
 using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shell;
 using System.Windows.Interop;
-using System.ComponentModel;
-using System.Runtime.InteropServices;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Reflection.Metadata;
-using Birdy_Browser;
-using System.Diagnostics;
+using System.Windows.Shell;
+using System.Windows.Threading;
 
 namespace Birdy_Fences
 {
@@ -68,6 +70,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
             }
             dynamic fencedata = Newtonsoft.Json.JsonConvert.DeserializeObject(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json"));
             void createFence(dynamic fence) {
+                bool isLocked = fence["isLocked"] != null && (bool)fence["isLocked"];
                 DockPanel dp = new();
                 Border cborder = new() { Background = new SolidColorBrush(Color.FromArgb(100, 0, 0, 0)), CornerRadius = new CornerRadius(6), Child = dp };
                 ContextMenu cm = new();
@@ -75,12 +78,11 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 cm.Items.Add(miNF);
                 MenuItem miNP = new() { Header = "New Portal Fence" };
                 cm.Items.Add(miNP);
-                MenuItem miRF = new() { Header = "Remove Fence" };
-                cm.Items.Add(miRF);
                 cm.Items.Add(new Separator());
-                bool isLocked = fence["isLocked"] != null && (bool)fence["isLocked"];
                 MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = isLocked };
                 cm.Items.Add(miLF);
+                MenuItem miRF = new() { Header = "Remove Fence" };
+                cm.Items.Add(miRF);
                 Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence["Title"], ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize, Width = fence["Width"], Height = fence["Height"], Top = fence["Y"], Left = fence["X"] };
                 HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
                 miLF.Click += (sender, e) =>
@@ -92,9 +94,13 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
                 };
                 miRF.Click += (sender, e) => {
-                    fence.Remove();
-                    win.Close();
-                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                    if (!isLocked)
+                    {
+                        fence.Remove();
+                        win.Close();
+                        File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                        cm.Items.Refresh();
+                    }
                 };
                 miNF.Click += (sender, e) => {
                     Newtonsoft.Json.Linq.JObject fnc = new(new Newtonsoft.Json.Linq.JProperty("Title", "New Fence"), new Newtonsoft.Json.Linq.JProperty("Width", 300), new Newtonsoft.Json.Linq.JProperty("Height", 150), new Newtonsoft.Json.Linq.JProperty("X", 0), new Newtonsoft.Json.Linq.JProperty("Y", 0), new Newtonsoft.Json.Linq.JProperty("ItemsType", "Data"), new Newtonsoft.Json.Linq.JProperty("Items", new Newtonsoft.Json.Linq.JArray()));
@@ -133,6 +139,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     }
                     else
                     {
+                        if (isLocked) return;
                         titlelabel.Visibility = Visibility.Collapsed;
                         titletb.Visibility = Visibility.Visible;
                         titletb.Text = (string)titlelabel.Content;
@@ -176,10 +183,10 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     ContextMenu mn = new();
                     MenuItem miE = new() { Header = "Edit" };
                     MenuItem miM = new() { Header = "Move.." };
-
                     MenuItem miRemove = new() { Header = "Remove" };
                     miRemove.Click += (sender, e) =>
                     {
+                        if (isLocked) return;
                         icon.Remove();
                         wpcont.Children.Remove(sp);
                         File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
@@ -219,6 +226,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     }
                     sp.Children.Add(lbl);
                     miM.Click += (sender, e) => {
+                        if (isLocked) return;
                         StackPanel cnt = new();
                         Window wwin = new() { Title = "Move " + (string)icon["Filename"], Content = cnt, Width = 300, Height = 100, WindowStartupLocation = WindowStartupLocation.CenterScreen };
                         ComboBox lv = new();
@@ -244,6 +252,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                         wwin.ShowDialog();
                     };
                     miE.Click += (sender, e) => {
+                        if (isLocked) return;
                         StackPanel cnt = new();
                         Window wwin = new() { Title = "Edit " + (string)icon["Filename"], Content = cnt, Width = 450, Height = 200, WindowStartupLocation = WindowStartupLocation.CenterScreen };
                         TextBox createsec(string name, string defaulval)
@@ -390,37 +399,47 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
     }
 
     internal static class HideAltTab
+{
+    public static class VirtualDesktopHelper
     {
-        public static class VirtualDesktopHelper
+        [DllImport("user32.dll")]
+        static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll")]
+        static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        [DllImport("shell32.dll")]
+        static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr FindWindowEx(IntPtr hP, IntPtr hC, string sC, string sW);
+
+        const int GWL_EXSTYLE = -20;
+        const int WS_EX_TOOLWINDOW = 0x00000080;
+
+        public static void MakeWindowPersistent(Window window)
         {
-            [DllImport("user32.dll")]
-            static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
-
-            [DllImport("user32.dll")]
-            static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-            [DllImport("shell32.dll")]
-            static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
-
-            const int GWL_EXSTYLE = -20;
-            const int WS_EX_TOOLWINDOW = 0x00000080;
-
-            public static void MakeWindowPersistent(Window window)
+            window.SourceInitialized += (s, e) =>
             {
-                window.SourceInitialized += (s, e) =>
-                {
-                    var helper = new WindowInteropHelper(window);
-                    IntPtr hWnd = helper.Handle;
+                var helper = new WindowInteropHelper(window);
+                helper.EnsureHandle();
+                IntPtr hWnd = helper.Handle;
 
-                    // Force a fake AppUserModelID (Windows uses this to link windows across desktops)
-                    SetCurrentProcessExplicitAppUserModelID("My.Persistent.Window");
+                // Set window owner to SHELLDLL_DefView for hiding in Alt+Tab and making it persistent
+                IntPtr progman = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "Progman", null);
+                IntPtr shellView = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
+                helper.Owner = shellView;
 
-                    // Set TOOLWINDOW style (optional)
-                    var exStyle = (int)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
-                    exStyle |= WS_EX_TOOLWINDOW;
-                    SetWindowLongPtr(hWnd, GWL_EXSTYLE, (IntPtr)exStyle);
-                };
-            }
+                // Force a fake AppUserModelID (optional, for virtual desktop persistence)
+                SetCurrentProcessExplicitAppUserModelID("Birdy.Fence");
+
+                // Set TOOLWINDOW style to hide from Alt+Tab
+                var exStyle = (int)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
+                exStyle |= WS_EX_TOOLWINDOW;
+                SetWindowLongPtr(hWnd, GWL_EXSTYLE, (IntPtr)exStyle);
+            };
         }
     }
+}
+
 }
