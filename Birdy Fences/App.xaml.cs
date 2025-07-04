@@ -95,6 +95,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     save();
                 };
                 miRF.Click += (sender, e) => {
+                    if (fence.isLocked) return;
                     fencedata.Remove(fence);
                     win.Close();
                     save();
@@ -208,7 +209,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     miRemove.Click += (sender, e) =>
                     {
                         var items = geticons();
-                        if (!fence.isLocked && items == null) return;
+                        if (fence.isLocked || items == null) return;
                         items.Remove(icon);
                         wpcont.Children.Remove(sp);
                         save();
@@ -216,7 +217,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     mn.Items.Add(miE);
                     mn.Items.Add(miM);
                     mn.Items.Add(miRemove);
-                    sp.ContextMenu = mn;
+                    btn.ContextMenu = mn;
                     Image ico = new() { Width = 36, Height = 36, Margin = new Thickness(9) };
                     try
                     {
@@ -249,7 +250,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     sp.Children.Add(lbl);
                     miM.Click += (sender, e) => {
                         var items = geticons();
-                        if (!fence.isLocked && items == null) return;
+                        if (fence.isLocked || items == null) return;
                         StackPanel cnt = new();
                         Window wwin = new() { Title = "Move " + icon.DisplayName, Content = cnt, Width = 300, Height = 100, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
                         ComboBox lv = new();
@@ -280,7 +281,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     };
                     miE.Click += (sender, e) => {
                         var items = geticons();
-                        if (fence.isLocked && items != null)
+                        if (fence.isLocked || items == null)
                         {
                             return;
                         }
@@ -348,7 +349,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 };
                 win.Drop += (object sender, DragEventArgs e) => {
                     var items = geticons();
-                    if (fence.isLocked && items == null)
+                    if (fence.isLocked || items == null)
                     {
                         return;
                     }
@@ -368,7 +369,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     if (fence.ItemsType == "Data")
                     {
                         var items = geticons();
-                        if (fence.isLocked && items == null)
+                        if (fence.isLocked || items == null)
                         {
                             return;
                         }
