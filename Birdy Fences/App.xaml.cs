@@ -1,5 +1,4 @@
-﻿using Birdy_Browser;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Configuration;
@@ -37,6 +36,8 @@ namespace Birdy_Fences
         static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
 
         const int GWL_HWNDPARENT = -8;
+        string userdir = "";
+        List<Fence> fencedata = new();
 
         IntPtr hprog = FindWindowEx(
             FindWindowEx(
@@ -48,7 +49,7 @@ namespace Birdy_Fences
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
-            string userdir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            userdir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             Directory.CreateDirectory(userdir + "\\Birdy Fences");
             // fences.json exist but contains only []
             if (!File.Exists(userdir + "\\Birdy Fences\\fences.json") || File.ReadAllText(userdir + "\\Birdy Fences\\fences.json").Trim() == "[]")
@@ -68,9 +69,9 @@ To edit title of the fence, double click on the title, then type the new title a
 Terminologies:
 Portal Fence - are files and shortcuts that exists on the selected Portal Folder");
             }
-            dynamic? fencedata = Newtonsoft.Json.JsonConvert.DeserializeObject(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json"));
-            void createFence(dynamic fence) {
-                bool isLocked = fence["isLocked"] != null && (bool)fence["isLocked"];
+            fencedata = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Fence>>(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json")) ?? new();
+            if (fencedata == null) fencedata = new();
+            void createFence(Fence fence) {
                 DockPanel dp = new();
                 Border cborder = new() { Background = new SolidColorBrush(Color.FromArgb(100, 0, 0, 0)), CornerRadius = new CornerRadius(6), Child = dp };
                 ContextMenu cm = new();
@@ -81,39 +82,37 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 MenuItem miRF = new() { Header = "Remove Fence" };
                 cm.Items.Add(miRF);
                 cm.Items.Add(new Separator());
-                MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = isLocked };
+                MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = fence.isLocked };
                 cm.Items.Add(miLF);
 
-                Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence["Title"], ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize, Width = fence["Width"], Height = fence["Height"], Top = fence["Y"], Left = fence["X"] };
+                Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence.Title, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = fence.isLocked ? ResizeMode.NoResize : ResizeMode.CanResize, Width = fence.Width, Height = fence.Height, Top = fence.Y, Left = fence.X };
                 HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
                 miLF.Click += (sender, e) =>
                 {
                     // Toggle fence lock: disables/enables resizing the fence
-                    isLocked = !isLocked;
-                    win.ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize;
-                    fence["isLocked"] = isLocked;
-
-                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                    fence.isLocked = !fence.isLocked;
+                    win.ResizeMode = fence.isLocked ? ResizeMode.NoResize : ResizeMode.CanResize;
+                    save();
                 };
                 miRF.Click += (sender, e) => {
-                    fence.Remove();
+                    fencedata.Remove(fence);
                     win.Close();
-                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                    save();
                 };
                 miRF.Click += (sender, e) => {
-                    if (!isLocked)
+                    if (!fence.isLocked)
                     {
-                        fence.Remove();
+                        fencedata.Remove(fence);
                         win.Close();
-                        File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                        save();
                         cm.Items.Refresh();
                     }
                 };
                 miNF.Click += (sender, e) => {
-                    Newtonsoft.Json.Linq.JObject fnc = new(new Newtonsoft.Json.Linq.JProperty("Title", "New Fence"), new Newtonsoft.Json.Linq.JProperty("Width", 300), new Newtonsoft.Json.Linq.JProperty("Height", 150), new Newtonsoft.Json.Linq.JProperty("X", 0), new Newtonsoft.Json.Linq.JProperty("Y", 0), new Newtonsoft.Json.Linq.JProperty("ItemsType", "Data"), new Newtonsoft.Json.Linq.JProperty("Items", new Newtonsoft.Json.Linq.JArray()));
+                    var fnc = new Fence();
                     fencedata.Add(fnc);
                     createFence(fnc);
-                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                    save();
                 };
                 miNP.Click += (sender, e) => {
                     using var dialog = new System.Windows.Forms.FolderBrowserDialog
@@ -124,32 +123,37 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     };
                     if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                     {
-                        Newtonsoft.Json.Linq.JObject fnc = new(new Newtonsoft.Json.Linq.JProperty("Title", "New Fence"), new Newtonsoft.Json.Linq.JProperty("Width", 300), new Newtonsoft.Json.Linq.JProperty("Height", 150), new Newtonsoft.Json.Linq.JProperty("X", 0), new Newtonsoft.Json.Linq.JProperty("Y", 0), new Newtonsoft.Json.Linq.JProperty("ItemsType", "Portal"), new Newtonsoft.Json.Linq.JProperty("Items", dialog.SelectedPath));
-
+                        var fnc = new Fence()
+                        {
+                            ItemsType = "Portal",
+                            Items = dialog.SelectedPath
+                        };
                         fencedata.Add(fnc);
                         createFence(fnc);
-                        File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                        save();   
                     }
                 };
                 WindowChrome.SetWindowChrome(win, new WindowChrome() { CaptionHeight = 0, ResizeBorderThickness = new Thickness(5) });
-                Label titlelabel = new() { Content = (string)fence["Title"], Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)), Foreground = Brushes.White, HorizontalContentAlignment = HorizontalAlignment.Center };
+                Label titlelabel = new() { Content = fence.Title, Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)), Foreground = Brushes.White, HorizontalContentAlignment = HorizontalAlignment.Center };
                 dp.Children.Add(titlelabel);
                 TextBox titletb = new() { HorizontalContentAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
                 dp.Children.Add(titletb);
                 titlelabel.MouseDown += (object sender, MouseButtonEventArgs e) => {
                     if (e.ClickCount == 1)
                     {
-                        if (e.LeftButton == MouseButtonState.Pressed && !isLocked)
+                        if (e.LeftButton == MouseButtonState.Pressed && !fence.isLocked)
                         {
                             win.DragMove();
                         }
                     }
                     else
                     {
-                        if (isLocked) return;
+                        if (fence.isLocked) return;
                         titlelabel.Visibility = Visibility.Collapsed;
                         titletb.Visibility = Visibility.Visible;
                         titletb.Text = (string)titlelabel.Content;
+                        titletb.Focus();
+                        titletb.SelectAll();
                     }
                 };
                 titletb.KeyDown += (object sender, KeyEventArgs e) => {
@@ -158,8 +162,8 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                         titlelabel.Visibility = Visibility.Visible;
                         titletb.Visibility = Visibility.Collapsed;
                         titlelabel.Content = titletb.Text;
-                        fence["Title"] = titletb.Text;
-                        File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                        fence.Title = titletb.Text;
+                        save();
 
                     }
                     else if (e.Key == Key.Escape)
@@ -169,22 +173,32 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     }
                 };
                 titlelabel.MouseUp += (object sender, MouseButtonEventArgs e) => {
-                    fence["Y"] = win.Top;
-                    fence["X"] = win.Left;
-                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                    fence.Y = win.Top;
+                    fence.X = win.Left;
+                    save();
                 };
                 win.SizeChanged += (sender, e) => {
-                    fence["Width"] = win.ActualWidth;
-                    fence["Height"] = win.ActualHeight;
-                    fence["Y"] = win.Top;
-                    fence["X"] = win.Left;
-                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                    fence.Width = win.ActualWidth;
+                    fence.Height = win.ActualHeight;
+                    fence.Y = win.Top;
+                    fence.X = win.Left;
+                   save();
                 };
                 DockPanel.SetDock(titlelabel, Dock.Top);
                 DockPanel.SetDock(titletb, Dock.Top);
                 WrapPanel wpcont = new() { AllowDrop = true };
-                void addicon(dynamic icon)
+
+                List<FenceItem>? geticons()
                 {
+                    if (!(fence.Items is List<FenceItem>) && fence.ItemsType != "Data")
+                    {
+                        return null;
+                    }
+                    return fence.Items as List<FenceItem>;
+                }
+                void addicon(FenceItem icon)
+                {
+                    Button btn = new() { Margin = new Thickness(5), Style = (Style)Application.Current.Resources["asbsLight"], Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
                     StackPanel sp = new() { Margin = new Thickness(5) };
                     sp.Width = 60;
                     ContextMenu mn = new();
@@ -193,21 +207,22 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     MenuItem miRemove = new() { Header = "Remove" };
                     miRemove.Click += (sender, e) =>
                     {
-                        if (isLocked) return;
-                        icon.Remove();
+                        var items = geticons();
+                        if (!fence.isLocked && items == null) return;
+                        items.Remove(icon);
                         wpcont.Children.Remove(sp);
-                        File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                        save();
                     };
                     mn.Items.Add(miE);
                     mn.Items.Add(miM);
                     mn.Items.Add(miRemove);
                     sp.ContextMenu = mn;
-                    Image ico = new() { Width = 40, Height = 40, Margin = new Thickness(5) };
+                    Image ico = new() { Width = 36, Height = 36, Margin = new Thickness(9) };
                     try
                     {
-                        if (icon["DisplayIcon"] == null)
+                        if (icon.DisplayIcon == "{AUTOICON}")
                         {
-                            var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon((string)icon["Filename"]);
+                            var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon(icon.Filename);
                             if (extractedIcon != null)
                             {
                                 ico.Source = extractedIcon.ToImageSource();
@@ -215,7 +230,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                         }
                         else
                         {
-                            ico.Source = new BitmapImage(new Uri((string)icon["DisplayIcon"], UriKind.Relative));
+                            ico.Source = new BitmapImage(new Uri(icon.DisplayIcon, UriKind.Relative));
                         }
                     }
                     catch
@@ -223,45 +238,56 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     sp.Children.Add(ico);
                     TextBlock lbl = new() { TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Brushes.White };
                     lbl.MaxHeight = (lbl.FontSize * 1.5) + (lbl.Margin.Top * 2);
-                    if (icon["DisplayName"] == null)
+                    if (icon.DisplayName == "{AUTONAME}")
                     {
-                        lbl.Text = new FileInfo((string)icon["Filename"]).Name;
+                        lbl.Text = new FileInfo(icon.Filename).Name;
                     }
                     else
                     {
-                        lbl.Text = (string)icon["DisplayName"];
+                        lbl.Text = icon.DisplayName;
                     }
                     sp.Children.Add(lbl);
                     miM.Click += (sender, e) => {
-                        if (isLocked) return;
+                        var items = geticons();
+                        if (!fence.isLocked && items == null) return;
                         StackPanel cnt = new();
-                        Window wwin = new() { Title = "Move " + (string)icon["Filename"], Content = cnt, Width = 300, Height = 100, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                        Window wwin = new() { Title = "Move " + icon.DisplayName, Content = cnt, Width = 300, Height = 100, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
                         ComboBox lv = new();
-                        foreach (dynamic icn in fence["Items"])
+                        foreach (FenceItem icn in items)
                         {
                             //StackPanel cc = new() { Orientation = Orientation.Horizontal};
                             //cc.Children.Add(new Image() { Source = ico.Source });
                             //cc.Children.Add(new Label() { Content = lbl.Text });
-                            lv.Items.Add(icn["Filename"]);
+                            lv.Items.Add(icn.Filename);
                         }
                         cnt.Children.Add(lv);
-                        Button btn = new() { Content = "Move" };
-                        cnt.Children.Add(btn);
-                        btn.Click += (sender, e) => {
-                            int id = wpcont.Children.IndexOf(sp);
-                            dynamic olddata = fence["Items"][lv.SelectedIndex];
-                            fence["Items"][lv.SelectedIndex] = fence["Items"][id];
-                            fence["Items"][id] = olddata;
-                            File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                        Button mbtn = new() { Content = "Move" };
+                        cnt.Children.Add(mbtn);
+                        mbtn.Click += (sender, e) => {
+                            if (lv.SelectedIndex == -1)
+                            {
+                                return;
+                            }
+                            int id = wpcont.Children.IndexOf(btn);
+                            FenceItem olddata = items[lv.SelectedIndex];
+                            items[lv.SelectedIndex] = items[id];
+                            items[id] = olddata;
+                            save();
                             initcontent();
                             wwin.Close();
                         };
                         wwin.ShowDialog();
                     };
                     miE.Click += (sender, e) => {
-                        if (isLocked) return;
+                        var items = geticons();
+                        if (fence.isLocked && items != null)
+                        {
+                            return;
+                        }
+                        
+                        
                         StackPanel cnt = new();
-                        Window wwin = new() { Title = "Edit " + (string)icon["Filename"], Content = cnt, Width = 450, Height = 200, WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                        Window wwin = new() { Title = "Edit " + icon.Filename, Content = cnt, Width = 450, Height = 200, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
                         TextBox createsec(string name, string defaulval)
                         {
                             DockPanel dpp = new();
@@ -272,52 +298,45 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                             cnt.Children.Add(dpp);
                             return tbb;
                         };
-                        int id = wpcont.Children.IndexOf(sp);
-                        TextBox tbDN = createsec("Display Name", fence["Items"][id]["DisplayName"] == null ? "{AUTONAME}" : fence["Items"][id]["DisplayName"]);
-                        TextBox tbDI = createsec("Display Icon", fence["Items"][id]["DisplayIcon"] == null ? "{AUTOICON}" : fence["Items"][id]["DisplayIcon"]);
-                        Button btn = new() { Content = "Apply" };
-                        btn.Click += (sender, e) => {
+                        int id = wpcont.Children.IndexOf(btn);
+                        TextBox tbDN = createsec("Display Name", items[id].DisplayName);
+                        TextBox tbDI = createsec("Display Icon", items[id].DisplayIcon);
+                        Button abtn = new() { Content = "Apply" };
+                        abtn.Click += (sender, e) => {
+                            items[id].DisplayIcon = tbDI.Text;
+                            items[id].DisplayName = tbDN.Text;
                             if (tbDN.Text == "{AUTONAME}")
                             {
-                                try
-                                {
-                                    fence["Items"][id]["DisplayName"].Remove();
-                                }
-                                catch { }
+                                
                             }
                             else
                             {
-                                fence["Items"][id]["DisplayName"] = tbDN.Text;
                                 lbl.Text = tbDN.Text;
                             }
                             if (tbDI.Text == "{AUTOICON}")
                             {
-                                try
-                                {
-                                    fence["Items"][id]["DisplayIcon"].Remove();
-                                }
-                                catch { }
+
                             }
                             else
                             {
-                                fence["Items"][id]["DisplayIcon"] = tbDI.Text;
                                 ico.Source = new BitmapImage(new Uri(tbDN.Text));
                             }
-                            File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                            save();
                             wwin.Close();
                         };
-                        cnt.Children.Add(btn);
+                        cnt.Children.Add(abtn);
                         wwin.ShowDialog();
                     };
                     var p = new Process();
-                    p.StartInfo = new ProcessStartInfo((string)icon["Filename"])
+                    p.StartInfo = new ProcessStartInfo(icon.Filename)
                     {
                         UseShellExecute = true
                     };
-                    new ClickEventAdder(sp).Click += (sender, e) => {
-                        p.Start();
+                    btn.Click += (sender, e) => {
+                        try { p.Start(); }catch { }
                     };
-                    wpcont.Children.Add(sp);
+                    btn.Content = sp;
+                    wpcont.Children.Add(btn);
                 };
                 win.DragOver += (object sender, DragEventArgs e) => {
                     e.Effects = DragDropEffects.Copy | DragDropEffects.Move;
@@ -328,37 +347,49 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     //e.Handled = true;
                 };
                 win.Drop += (object sender, DragEventArgs e) => {
+                    var items = geticons();
+                    if (fence.isLocked && items == null)
+                    {
+                        return;
+                    }
+
                     string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                     foreach (string dt in files)
                     {
-                        Newtonsoft.Json.Linq.JObject icon = new(new Newtonsoft.Json.Linq.JProperty("Filename", dt));
-                        fence["Items"].Add(icon);
+                        var icon = new FenceItem() { Filename = dt };
+                        items.Add(icon);
                         addicon(icon);
                     }
-                    File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+                    save();
                 };
                 void initcontent()
                 {
                     wpcont.Children.Clear();
-                    if (fence["ItemsType"] == "Data")
+                    if (fence.ItemsType == "Data")
                     {
-                        foreach (dynamic icon in fence["Items"])
+                        var items = geticons();
+                        if (fence.isLocked && items == null)
+                        {
+                            return;
+                        }
+
+                        foreach (FenceItem icon in items)
                         {
                             addicon(icon);
                         }
-                    }else if (fence["ItemsType"] == "Portal")
+                    }else if (fence.ItemsType == "Portal")
                     {
-                        string dpath = (string)fence["Items"];
+                        string dpath = (string)fence.Items;
                         string[] dirs = Directory.GetDirectories(dpath);
                         foreach (string dir in dirs)
                         {
-                            Newtonsoft.Json.Linq.JObject icon = new(new Newtonsoft.Json.Linq.JProperty("Filename", dir), new Newtonsoft.Json.Linq.JProperty("DisplayIcon", "folder-White.png"));
+                            FenceItem icon = new FenceItem() { Filename = dir};
                             addicon(icon);
                         }
                         string[] files = Directory.GetFiles(dpath);
                         foreach (string file in files)
                         {
-                            Newtonsoft.Json.Linq.JObject icon = new(new Newtonsoft.Json.Linq.JProperty("Filename", file));
+                            FenceItem icon = new FenceItem() { Filename = file };
                             addicon(icon);
                         }
                     }
@@ -378,6 +409,30 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 }
             }
         }
+
+        void save()
+        {
+            File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+        }
+    }
+
+    class Fence
+    {
+        public string Title = "New fences";
+        public bool isLocked = false;
+        public double X = 500;
+        public double Y = 500;
+        public double Width = 500;
+        public double Height = 300;
+        public string ItemsType = "Data";
+        public object Items = new List<FenceItem>();
+    }
+
+    class FenceItem
+    {
+        public string Filename = "";
+        public string DisplayName = "{AUTONAME}";
+        public string DisplayIcon = "{AUTOICON}";
     }
 
     internal static class IconUtilities
@@ -438,7 +493,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     helper.Owner = shellView;
 
                     // Force a fake AppUserModelID (optional, for virtual desktop persistence)
-                    SetCurrentProcessExplicitAppUserModelID("Birdy.Fence");
+                    SetCurrentProcessExplicitAppUserModelID("Birdy.Fences");
 
                     // Set TOOLWINDOW style to hide from Alt+Tab
                     var exStyle = (int)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
