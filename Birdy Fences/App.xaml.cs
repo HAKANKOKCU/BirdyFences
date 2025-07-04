@@ -68,7 +68,7 @@ To edit title of the fence, double click on the title, then type the new title a
 Terminologies:
 Portal Fence - are files and shortcuts that exists on the selected Portal Folder");
             }
-            dynamic fencedata = Newtonsoft.Json.JsonConvert.DeserializeObject(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json"));
+            dynamic? fencedata = Newtonsoft.Json.JsonConvert.DeserializeObject(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json"));
             void createFence(dynamic fence) {
                 bool isLocked = fence["isLocked"] != null && (bool)fence["isLocked"];
                 DockPanel dp = new();
@@ -78,13 +78,9 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 cm.Items.Add(miNF);
                 MenuItem miNP = new() { Header = "New Portal Fence" };
                 cm.Items.Add(miNP);
-                cm.Items.Add(new Separator());
-                MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = isLocked };
-                cm.Items.Add(miLF);
                 MenuItem miRF = new() { Header = "Remove Fence" };
                 cm.Items.Add(miRF);
                 cm.Items.Add(new Separator());
-                bool isLocked = fence["isLocked"] != null && (bool)fence["isLocked"];
                 MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = isLocked };
                 cm.Items.Add(miLF);
 
@@ -410,48 +406,6 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
     }
 
     internal static class HideAltTab
-{
-    public static class VirtualDesktopHelper
-    {
-        [DllImport("user32.dll")]
-        static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
-
-        [DllImport("user32.dll")]
-        static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-        [DllImport("shell32.dll")]
-        static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        static extern IntPtr FindWindowEx(IntPtr hP, IntPtr hC, string sC, string sW);
-
-        const int GWL_EXSTYLE = -20;
-        const int WS_EX_TOOLWINDOW = 0x00000080;
-
-        public static void MakeWindowPersistent(Window window)
-        {
-            window.SourceInitialized += (s, e) =>
-            {
-                var helper = new WindowInteropHelper(window);
-                helper.EnsureHandle();
-                IntPtr hWnd = helper.Handle;
-
-                // Set window owner to SHELLDLL_DefView for hiding in Alt+Tab and making it persistent
-                IntPtr progman = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "Progman", null);
-                IntPtr shellView = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
-                helper.Owner = shellView;
-
-                // Force a fake AppUserModelID (optional, for virtual desktop persistence)
-                SetCurrentProcessExplicitAppUserModelID("Birdy.Fence");
-
-                // Set TOOLWINDOW style to hide from Alt+Tab
-                var exStyle = (int)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
-                exStyle |= WS_EX_TOOLWINDOW;
-                SetWindowLongPtr(hWnd, GWL_EXSTYLE, (IntPtr)exStyle);
-            };
-        }
-    }
-}
     {
         public static class VirtualDesktopHelper
         {
@@ -464,6 +418,9 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
             [DllImport("shell32.dll")]
             static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
 
+            [DllImport("user32.dll", SetLastError = true)]
+            static extern IntPtr FindWindowEx(IntPtr hP, IntPtr hC, string sC, string? sW);
+
             const int GWL_EXSTYLE = -20;
             const int WS_EX_TOOLWINDOW = 0x00000080;
 
@@ -472,12 +429,18 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                 window.SourceInitialized += (s, e) =>
                 {
                     var helper = new WindowInteropHelper(window);
+                    helper.EnsureHandle();
                     IntPtr hWnd = helper.Handle;
 
-                    // Force a fake AppUserModelID (Windows uses this to link windows across desktops)
-                    SetCurrentProcessExplicitAppUserModelID("My.Persistent.Window");
+                    // Set window owner to SHELLDLL_DefView for hiding in Alt+Tab and making it persistent
+                    IntPtr progman = FindWindowEx(IntPtr.Zero, IntPtr.Zero, "Progman", null);
+                    IntPtr shellView = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
+                    helper.Owner = shellView;
 
-                    // Set TOOLWINDOW style (optional)
+                    // Force a fake AppUserModelID (optional, for virtual desktop persistence)
+                    SetCurrentProcessExplicitAppUserModelID("Birdy.Fence");
+
+                    // Set TOOLWINDOW style to hide from Alt+Tab
                     var exStyle = (int)GetWindowLongPtr(hWnd, GWL_EXSTYLE);
                     exStyle |= WS_EX_TOOLWINDOW;
                     SetWindowLongPtr(hWnd, GWL_EXSTYLE, (IntPtr)exStyle);
