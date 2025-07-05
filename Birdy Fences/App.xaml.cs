@@ -317,9 +317,17 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
             StackPanel sp = new() { Margin = new Thickness(5) };
             sp.Width = 60;
             ContextMenu mn = new();
+
             MenuItem miE = new() { Header = "Edit" };
             MenuItem miM = new() { Header = "Move.." };
             MenuItem miRemove = new() { Header = "Remove" };
+
+            mn.Opened += (e, s) => {
+                miE.IsEnabled = !isLocked;
+                miM.IsEnabled = !isLocked;
+                miRemove.IsEnabled = !isLocked;
+            };
+
             miRemove.Click += (sender, e) =>
             {
                 var items = geticons();
