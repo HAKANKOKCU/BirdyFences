@@ -4,7 +4,7 @@ Thanks to Lycol50 for the icon
 
 BirdyFences is alternative to the StarDock's Fences
 
-![resim](https://user-images.githubusercontent.com/103432992/190169653-c00308b4-afb1-407b-b1e6-be29d8ac5ecc.png)
+![resim](https://github.com/user-attachments/assets/f6e8497d-b266-499a-b92b-2e62e5319b64)
 
 # How to
 Just open the exe to get started.
