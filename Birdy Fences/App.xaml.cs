@@ -362,6 +362,7 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                 string[] files = Directory.GetFiles(dpath);
                 foreach (string file in files)
                 {
+                    if (Path.GetFileName(file).ToLower() == "desktop.ini") continue;
                     FenceItem icon = new FenceItem() { Filename = file };
                     addicon(icon);
                 }
