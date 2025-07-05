@@ -51,6 +51,7 @@ namespace Birdy_Fences
         {
             userdir = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             Directory.CreateDirectory(userdir + "\\Birdy Fences");
+            Directory.CreateDirectory(userdir + "\\Birdy Fences\\Shortcuts");
             // fences.json exist but contains only []
             if (!File.Exists(userdir + "\\Birdy Fences\\fences.json") || File.ReadAllText(userdir + "\\Birdy Fences\\fences.json").Trim() == "[]")
             {
@@ -92,12 +93,6 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     // Toggle fence lock: disables/enables resizing the fence
                     fence.isLocked = !fence.isLocked;
                     win.ResizeMode = fence.isLocked ? ResizeMode.NoResize : ResizeMode.CanResize;
-                    save();
-                };
-                miRF.Click += (sender, e) => {
-                    if (fence.isLocked) return;
-                    fencedata.Remove(fence);
-                    win.Close();
                     save();
                 };
                 miRF.Click += (sender, e) => {
@@ -211,7 +206,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                         var items = geticons();
                         if (fence.isLocked || items == null) return;
                         items.Remove(icon);
-                        wpcont.Children.Remove(sp);
+                        wpcont.Children.Remove(btn);
                         save();
                     };
                     mn.Items.Add(miE);
@@ -223,10 +218,17 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     {
                         if (icon.DisplayIcon == "{AUTOICON}")
                         {
-                            var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon(icon.Filename);
-                            if (extractedIcon != null)
+                            if (Directory.Exists(icon.Filename)) //is it a folder?
                             {
-                                ico.Source = extractedIcon.ToImageSource();
+                                ico.Source = new BitmapImage(new Uri("pack://application:,,,/folder-White.png"));
+                            }
+                            else
+                            {
+                                var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon(icon.Filename);
+                                if (extractedIcon != null)
+                                {
+                                    ico.Source = extractedIcon.ToImageSource();
+                                }
                             }
                         }
                         else
@@ -241,7 +243,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     lbl.MaxHeight = (lbl.FontSize * 1.5) + (lbl.Margin.Top * 2);
                     if (icon.DisplayName == "{AUTONAME}")
                     {
-                        lbl.Text = new FileInfo(icon.Filename).Name;
+                        lbl.Text = Path.GetFileNameWithoutExtension(icon.Filename);
                     }
                     else
                     {
@@ -334,7 +336,7 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                         UseShellExecute = true
                     };
                     btn.Click += (sender, e) => {
-                        try { p.Start(); }catch { }
+                        try { p.Start(); }catch (Exception ex) { MessageBox.Show(ex.ToString(), "Error while launching", MessageBoxButton.OK, MessageBoxImage.Error); }
                     };
                     btn.Content = sp;
                     wpcont.Children.Add(btn);
@@ -357,7 +359,23 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
                     string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
                     foreach (string dt in files)
                     {
-                        var icon = new FenceItem() { Filename = dt };
+                        string extension = Path.GetExtension(dt).ToLower();
+                        string filepath = dt;
+                        string displayname = "{AUTONAME}";
+                        if (extension == ".lnk" || extension == ".url")
+                        {
+                            string filename = Path.GetFileName(dt);
+                            displayname = Path.GetFileNameWithoutExtension(dt);
+                            int c = 0;
+                            do
+                            {
+                                filename = c + Path.GetFileName(filepath);
+                                filepath = userdir + "\\Birdy Fences\\Shortcuts\\" + filename;
+                                ++c;
+                            } while (File.Exists(filepath));
+                            File.Copy(dt, filepath);
+                        }
+                        var icon = new FenceItem() { Filename = filepath, DisplayName = displayname };
                         items.Add(icon);
                         addicon(icon);
                     }
