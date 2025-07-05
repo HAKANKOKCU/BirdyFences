@@ -26,26 +26,8 @@ namespace Birdy_Fences
     /// </summary>
     public partial class App : Application
     {
-        [DllImport("user32.dll", SetLastError = true)]
-        static extern int SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        static extern IntPtr FindWindow(string lpWindowClass, string lpWindowName);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
-
-        const int GWL_HWNDPARENT = -8;
-        string userdir = "";
-        List<Fence> fencedata = new();
-
-        IntPtr hprog = FindWindowEx(
-            FindWindowEx(
-                FindWindow("Progman", "Program Manager"),
-                IntPtr.Zero, "SHELLDLL_DefView", ""
-            ),
-            IntPtr.Zero, "SysListView32", "FolderView"
-        );
+        public static string userdir = "";
+        public static List<Fence> fencedata = new();   
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
@@ -72,372 +54,43 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
             }
             fencedata = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Fence>>(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json")) ?? new();
             if (fencedata == null) fencedata = new();
-            void createFence(Fence fence) {
-                DockPanel dp = new();
-                Border cborder = new() { Background = new SolidColorBrush(Color.FromArgb(100, 0, 0, 0)), CornerRadius = new CornerRadius(6), Child = dp };
-                ContextMenu cm = new();
-                MenuItem miNF = new() { Header = "New Fence" };
-                cm.Items.Add(miNF);
-                MenuItem miNP = new() { Header = "New Portal Fence" };
-                cm.Items.Add(miNP);
-                MenuItem miRF = new() { Header = "Remove Fence" };
-                cm.Items.Add(miRF);
-                cm.Items.Add(new Separator());
-                MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true, IsChecked = fence.isLocked };
-                cm.Items.Add(miLF);
-
-                Window win = new() { ContextMenu = cm, AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, Title = fence.Title, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Content = cborder, ResizeMode = fence.isLocked ? ResizeMode.NoResize : ResizeMode.CanResize, Width = fence.Width, Height = fence.Height, Top = fence.Y, Left = fence.X };
-                HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
-                miLF.Click += (sender, e) =>
-                {
-                    // Toggle fence lock: disables/enables resizing the fence
-                    fence.isLocked = !fence.isLocked;
-                    win.ResizeMode = fence.isLocked ? ResizeMode.NoResize : ResizeMode.CanResize;
-                    save();
-                };
-                miRF.Click += (sender, e) => {
-                    if (!fence.isLocked)
-                    {
-                        fencedata.Remove(fence);
-                        win.Close();
-                        save();
-                        cm.Items.Refresh();
-                    }
-                };
-                miNF.Click += (sender, e) => {
-                    var fnc = new Fence();
-                    fencedata.Add(fnc);
-                    createFence(fnc);
-                    save();
-                };
-                miNP.Click += (sender, e) => {
-                    using var dialog = new System.Windows.Forms.FolderBrowserDialog
-                    {
-                        Description = "Select Folder For Portal",
-                        UseDescriptionForTitle = true,
-                        ShowNewFolderButton = true
-                    };
-                    if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                    {
-                        var fnc = new Fence()
-                        {
-                            ItemsType = "Portal",
-                            Items = dialog.SelectedPath
-                        };
-                        fencedata.Add(fnc);
-                        createFence(fnc);
-                        save();   
-                    }
-                };
-                WindowChrome.SetWindowChrome(win, new WindowChrome() { CaptionHeight = 0, ResizeBorderThickness = new Thickness(5) });
-                Label titlelabel = new() { Content = fence.Title, Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)), Foreground = Brushes.White, HorizontalContentAlignment = HorizontalAlignment.Center };
-                dp.Children.Add(titlelabel);
-                TextBox titletb = new() { HorizontalContentAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
-                dp.Children.Add(titletb);
-                titlelabel.MouseDown += (object sender, MouseButtonEventArgs e) => {
-                    if (e.ClickCount == 1)
-                    {
-                        if (e.LeftButton == MouseButtonState.Pressed && !fence.isLocked)
-                        {
-                            win.DragMove();
-                        }
-                    }
-                    else
-                    {
-                        if (fence.isLocked) return;
-                        titlelabel.Visibility = Visibility.Collapsed;
-                        titletb.Visibility = Visibility.Visible;
-                        titletb.Text = (string)titlelabel.Content;
-                        titletb.Focus();
-                        titletb.SelectAll();
-                    }
-                };
-                titletb.KeyDown += (object sender, KeyEventArgs e) => {
-                    if (e.Key == Key.Enter)
-                    {
-                        titlelabel.Visibility = Visibility.Visible;
-                        titletb.Visibility = Visibility.Collapsed;
-                        titlelabel.Content = titletb.Text;
-                        fence.Title = titletb.Text;
-                        save();
-
-                    }
-                    else if (e.Key == Key.Escape)
-                    {
-                        titlelabel.Visibility = Visibility.Visible;
-                        titletb.Visibility = Visibility.Collapsed;
-                    }
-                };
-                titlelabel.MouseUp += (object sender, MouseButtonEventArgs e) => {
-                    fence.Y = win.Top;
-                    fence.X = win.Left;
-                    save();
-                };
-                win.SizeChanged += (sender, e) => {
-                    fence.Width = win.ActualWidth;
-                    fence.Height = win.ActualHeight;
-                    fence.Y = win.Top;
-                    fence.X = win.Left;
-                   save();
-                };
-                DockPanel.SetDock(titlelabel, Dock.Top);
-                DockPanel.SetDock(titletb, Dock.Top);
-                WrapPanel wpcont = new() { AllowDrop = true };
-
-                List<FenceItem>? geticons()
-                {
-                    if (!(fence.Items is List<FenceItem>) && fence.ItemsType != "Data")
-                    {
-                        return null;
-                    }
-                    return fence.Items as List<FenceItem>;
-                }
-                void addicon(FenceItem icon)
-                {
-                    Button btn = new() { Margin = new Thickness(5), Style = (Style)Application.Current.Resources["asbsLight"], Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
-                    StackPanel sp = new() { Margin = new Thickness(5) };
-                    sp.Width = 60;
-                    ContextMenu mn = new();
-                    MenuItem miE = new() { Header = "Edit" };
-                    MenuItem miM = new() { Header = "Move.." };
-                    MenuItem miRemove = new() { Header = "Remove" };
-                    miRemove.Click += (sender, e) =>
-                    {
-                        var items = geticons();
-                        if (fence.isLocked || items == null) return;
-                        items.Remove(icon);
-                        wpcont.Children.Remove(btn);
-                        save();
-                    };
-                    mn.Items.Add(miE);
-                    mn.Items.Add(miM);
-                    mn.Items.Add(miRemove);
-                    btn.ContextMenu = mn;
-                    Image ico = new() { Width = 36, Height = 36, Margin = new Thickness(9) };
-                    try
-                    {
-                        if (icon.DisplayIcon == "{AUTOICON}")
-                        {
-                            if (Directory.Exists(icon.Filename)) //is it a folder?
-                            {
-                                ico.Source = new BitmapImage(new Uri("pack://application:,,,/folder-White.png"));
-                            }
-                            else
-                            {
-                                var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon(icon.Filename);
-                                if (extractedIcon != null)
-                                {
-                                    ico.Source = extractedIcon.ToImageSource();
-                                }
-                            }
-                        }
-                        else
-                        {
-                            ico.Source = new BitmapImage(new Uri(icon.DisplayIcon, UriKind.Relative));
-                        }
-                    }
-                    catch
-                    { }
-                    sp.Children.Add(ico);
-                    TextBlock lbl = new() { TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Brushes.White };
-                    lbl.MaxHeight = (lbl.FontSize * 1.5) + (lbl.Margin.Top * 2);
-                    if (icon.DisplayName == "{AUTONAME}")
-                    {
-                        lbl.Text = Path.GetFileNameWithoutExtension(icon.Filename);
-                    }
-                    else
-                    {
-                        lbl.Text = icon.DisplayName;
-                    }
-                    sp.Children.Add(lbl);
-                    miM.Click += (sender, e) => {
-                        var items = geticons();
-                        if (fence.isLocked || items == null) return;
-                        StackPanel cnt = new();
-                        Window wwin = new() { Title = "Move " + icon.DisplayName, Content = cnt, Width = 300, Height = 100, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
-                        ComboBox lv = new();
-                        foreach (FenceItem icn in items)
-                        {
-                            //StackPanel cc = new() { Orientation = Orientation.Horizontal};
-                            //cc.Children.Add(new Image() { Source = ico.Source });
-                            //cc.Children.Add(new Label() { Content = lbl.Text });
-                            lv.Items.Add(icn.Filename);
-                        }
-                        cnt.Children.Add(lv);
-                        Button mbtn = new() { Content = "Move" };
-                        cnt.Children.Add(mbtn);
-                        mbtn.Click += (sender, e) => {
-                            if (lv.SelectedIndex == -1)
-                            {
-                                return;
-                            }
-                            int id = wpcont.Children.IndexOf(btn);
-                            FenceItem olddata = items[lv.SelectedIndex];
-                            items[lv.SelectedIndex] = items[id];
-                            items[id] = olddata;
-                            save();
-                            initcontent();
-                            wwin.Close();
-                        };
-                        wwin.ShowDialog();
-                    };
-                    miE.Click += (sender, e) => {
-                        var items = geticons();
-                        if (fence.isLocked || items == null)
-                        {
-                            return;
-                        }
-                        
-                        
-                        StackPanel cnt = new();
-                        Window wwin = new() { Title = "Edit " + icon.Filename, Content = cnt, Width = 450, Height = 200, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
-                        TextBox createsec(string name, string defaulval)
-                        {
-                            DockPanel dpp = new();
-                            Label lbl = new() { Content = name };
-                            dpp.Children.Add(lbl);
-                            TextBox tbb = new() { Text = defaulval };
-                            dpp.Children.Add(tbb);
-                            cnt.Children.Add(dpp);
-                            return tbb;
-                        };
-                        int id = wpcont.Children.IndexOf(btn);
-                        TextBox tbDN = createsec("Display Name", items[id].DisplayName);
-                        TextBox tbDI = createsec("Display Icon", items[id].DisplayIcon);
-                        Button abtn = new() { Content = "Apply" };
-                        abtn.Click += (sender, e) => {
-                            items[id].DisplayIcon = tbDI.Text;
-                            items[id].DisplayName = tbDN.Text;
-                            if (tbDN.Text == "{AUTONAME}")
-                            {
-                                
-                            }
-                            else
-                            {
-                                lbl.Text = tbDN.Text;
-                            }
-                            if (tbDI.Text == "{AUTOICON}")
-                            {
-
-                            }
-                            else
-                            {
-                                ico.Source = new BitmapImage(new Uri(tbDN.Text));
-                            }
-                            save();
-                            wwin.Close();
-                        };
-                        cnt.Children.Add(abtn);
-                        wwin.ShowDialog();
-                    };
-                    var p = new Process();
-                    p.StartInfo = new ProcessStartInfo(icon.Filename)
-                    {
-                        UseShellExecute = true
-                    };
-                    btn.Click += (sender, e) => {
-                        try { p.Start(); }catch (Exception ex) { MessageBox.Show(ex.ToString(), "Error while launching", MessageBoxButton.OK, MessageBoxImage.Error); }
-                    };
-                    btn.Content = sp;
-                    wpcont.Children.Add(btn);
-                };
-                win.DragOver += (object sender, DragEventArgs e) => {
-                    e.Effects = DragDropEffects.Copy | DragDropEffects.Move;
-                    //e.Handled = true;
-                };
-                win.DragEnter += (object sender, DragEventArgs e) => {
-                    e.Effects = DragDropEffects.Copy | DragDropEffects.Move;
-                    //e.Handled = true;
-                };
-                win.Drop += (object sender, DragEventArgs e) => {
-                    var items = geticons();
-                    if (fence.isLocked || items == null)
-                    {
-                        return;
-                    }
-
-                    string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                    foreach (string dt in files)
-                    {
-                        string extension = Path.GetExtension(dt).ToLower();
-                        string filepath = dt;
-                        string displayname = "{AUTONAME}";
-                        if (extension == ".lnk" || extension == ".url")
-                        {
-                            string filename = Path.GetFileName(dt);
-                            displayname = Path.GetFileNameWithoutExtension(dt);
-                            int c = 0;
-                            do
-                            {
-                                filename = c + Path.GetFileName(filepath);
-                                filepath = userdir + "\\Birdy Fences\\Shortcuts\\" + filename;
-                                ++c;
-                            } while (File.Exists(filepath));
-                            File.Copy(dt, filepath);
-                        }
-                        var icon = new FenceItem() { Filename = filepath, DisplayName = displayname };
-                        items.Add(icon);
-                        addicon(icon);
-                    }
-                    save();
-                };
-                void initcontent()
-                {
-                    wpcont.Children.Clear();
-                    if (fence.ItemsType == "Data")
-                    {
-                        var items = geticons();
-                        if (fence.isLocked || items == null)
-                        {
-                            return;
-                        }
-
-                        foreach (FenceItem icon in items)
-                        {
-                            addicon(icon);
-                        }
-                    }else if (fence.ItemsType == "Portal")
-                    {
-                        string dpath = (string)fence.Items;
-                        string[] dirs = Directory.GetDirectories(dpath);
-                        foreach (string dir in dirs)
-                        {
-                            FenceItem icon = new FenceItem() { Filename = dir};
-                            addicon(icon);
-                        }
-                        string[] files = Directory.GetFiles(dpath);
-                        foreach (string file in files)
-                        {
-                            FenceItem icon = new FenceItem() { Filename = file };
-                            addicon(icon);
-                        }
-                    }
-                }
-                
-                initcontent();
-                ScrollViewer wpcontscr = new() { Content = wpcont, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-                dp.Children.Add(wpcontscr);
-                win.Show();
-                win.Loaded += (sender,e) => SetWindowLong(new WindowInteropHelper(win).Handle, GWL_HWNDPARENT, hprog);
-            }
+            
             if (fencedata != null)
             {
-                foreach (dynamic fence in fencedata)
+                foreach (Fence fence in fencedata)
                 {
-                    createFence(fence);
+                    fence.init();
                 }
             }
         }
 
-        void save()
+        public static void save()
         {
             File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
         }
     }
 
-    class Fence
+    public class Fence
     {
-        public string Title = "New fences";
+        const int GWL_HWNDPARENT = -8;
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern int SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr FindWindow(string lpWindowClass, string lpWindowName);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
+
+        IntPtr hprog = FindWindowEx(
+            FindWindowEx(
+                FindWindow("Progman", "Program Manager"),
+                IntPtr.Zero, "SHELLDLL_DefView", ""
+            ),
+            IntPtr.Zero, "SysListView32", "FolderView"
+        );
+
+        public string Title = "New fence";
         public bool isLocked = false;
         public double X = 500;
         public double Y = 500;
@@ -445,9 +98,388 @@ Portal Fence - are files and shortcuts that exists on the selected Portal Folder
         public double Height = 300;
         public string ItemsType = "Data";
         public object Items = new List<FenceItem>();
+        DockPanel dp = new();
+        Border cborder = new() { Background = new SolidColorBrush(Color.FromArgb(100, 0, 0, 0)), CornerRadius = new CornerRadius(6) };
+        ContextMenu cm = new();
+        MenuItem miNF = new() { Header = "New Fence" };
+        MenuItem miNP = new() { Header = "New Portal Fence" };
+        MenuItem miRF = new() { Header = "Remove Fence" };
+        MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true };
+        Window win = new() { AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+        Label titlelabel = new() { Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)), Foreground = Brushes.White, HorizontalContentAlignment = HorizontalAlignment.Center };
+        WrapPanel wpcont = new() { AllowDrop = true };
+
+        public void init()
+        {
+            cm.Items.Add(miNF);
+            cm.Items.Add(miNP);
+            cm.Items.Add(miRF);
+            cm.Items.Add(new Separator());
+            cm.Items.Add(miLF);
+            HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
+            win.Content = cborder;
+            win.Width = Width;
+            win.Height = Height;
+            win.Top = Y;
+            win.Left = X;
+            win.ContextMenu = cm;
+            cborder.Child = dp;
+
+            cm.Opened += (e,s) => {
+                miLF.IsChecked = isLocked;
+                miRF.IsEnabled = !isLocked;
+            };
+
+            miLF.Click += (sender, e) =>
+            {
+                // Toggle fence lock: disables/enables resizing the fence
+                isLocked = !isLocked;
+                applyFenceSettings();
+                App.save();
+            };
+            miRF.Click += (sender, e) => {
+                if (!isLocked)
+                {
+                    App.fencedata.Remove(this);
+                    win.Close();
+                    App.save();
+                    cm.Items.Refresh();
+                }
+            };
+            miNF.Click += (sender, e) => {
+                var fnc = new Fence();
+                App.fencedata.Add(fnc);
+                fnc.init();
+                App.save();
+            };
+            miNP.Click += (sender, e) => {
+                using var dialog = new System.Windows.Forms.FolderBrowserDialog
+                {
+                    Description = "Select Folder For Portal",
+                    UseDescriptionForTitle = true,
+                    ShowNewFolderButton = true
+                };
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    var fnc = new Fence()
+                    {
+                        ItemsType = "Portal",
+                        Items = dialog.SelectedPath
+                    };
+                    App.fencedata.Add(fnc);
+                    fnc.init();
+                    App.save();
+                }
+            };
+            WindowChrome.SetWindowChrome(win, new WindowChrome() { CaptionHeight = 0, ResizeBorderThickness = new Thickness(5) });
+
+            titlelabel.Content = Title;
+            dp.Children.Add(titlelabel);
+            TextBox titletb = new() { HorizontalContentAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
+            dp.Children.Add(titletb);
+            titlelabel.MouseDown += (object sender, MouseButtonEventArgs e) => {
+                if (e.ClickCount == 1)
+                {
+                    if (e.LeftButton == MouseButtonState.Pressed && !isLocked)
+                    {
+                        win.DragMove();
+                    }
+                }
+                else
+                {
+                    if (isLocked) return;
+                    titlelabel.Visibility = Visibility.Collapsed;
+                    titletb.Visibility = Visibility.Visible;
+                    titletb.Text = (string)titlelabel.Content;
+                    titletb.Focus();
+                    titletb.SelectAll();
+                }
+            };
+            titletb.KeyDown += (object sender, KeyEventArgs e) => {
+                if (e.Key == Key.Enter)
+                {
+                    titlelabel.Visibility = Visibility.Visible;
+                    titletb.Visibility = Visibility.Collapsed;
+                    Title = titletb.Text;
+                    applyFenceSettings();
+                    App.save();
+
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    titlelabel.Visibility = Visibility.Visible;
+                    titletb.Visibility = Visibility.Collapsed;
+                }
+            };
+            titlelabel.MouseUp += (object sender, MouseButtonEventArgs e) => {
+                Y = win.Top;
+                X = win.Left;
+                App.save();
+            };
+            win.SizeChanged += (sender, e) => {
+                Width = win.ActualWidth;
+                Height = win.ActualHeight;
+                Y = win.Top;
+                X = win.Left;
+                App.save();
+            };
+            DockPanel.SetDock(titlelabel, Dock.Top);
+            DockPanel.SetDock(titletb, Dock.Top);
+            
+            win.DragOver += (object sender, DragEventArgs e) => {
+                e.Effects = DragDropEffects.Copy | DragDropEffects.Move;
+                //e.Handled = true;
+            };
+            win.DragEnter += (object sender, DragEventArgs e) => {
+                e.Effects = DragDropEffects.Copy | DragDropEffects.Move;
+                //e.Handled = true;
+            };
+            win.Drop += (object sender, DragEventArgs e) => {
+                var items = geticons();
+                if (isLocked || items == null)
+                {
+                    return;
+                }
+
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                foreach (string dt in files)
+                {
+                    string extension = Path.GetExtension(dt).ToLower();
+                    string filepath = dt;
+                    string displayname = "{AUTONAME}";
+                    if (extension == ".lnk" || extension == ".url")
+                    {
+                        string filename = Path.GetFileName(dt);
+                        displayname = Path.GetFileNameWithoutExtension(dt);
+                        int c = 0;
+                        do
+                        {
+                            filename = c + Path.GetFileName(filepath);
+                            filepath = App.userdir + "\\Birdy Fences\\Shortcuts\\" + filename;
+                            ++c;
+                        } while (File.Exists(filepath));
+                        File.Copy(dt, filepath);
+                    }
+                    var icon = new FenceItem() { Filename = filepath, DisplayName = displayname };
+                    items.Add(icon);
+                    addicon(icon);
+                }
+                App.save();
+            };
+
+
+            initcontent();
+            ScrollViewer wpcontscr = new() { Content = wpcont, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            dp.Children.Add(wpcontscr);
+            win.Show();
+            win.Loaded += (sender, e) => SetWindowLong(new WindowInteropHelper(win).Handle, GWL_HWNDPARENT, hprog);
+
+            applyFenceSettings();
+        }
+
+        public void initcontent()
+        {
+            wpcont.Children.Clear();
+            if (ItemsType == "Data")
+            {
+                var items = geticons();
+                if (items == null)
+                {
+                    return;
+                }
+
+                foreach (FenceItem icon in items)
+                {
+                    addicon(icon);
+                }
+            }
+            else if (ItemsType == "Portal")
+            {
+                string dpath = (string)Items;
+                string[] dirs = Directory.GetDirectories(dpath);
+                foreach (string dir in dirs)
+                {
+                    FenceItem icon = new FenceItem() { Filename = dir };
+                    addicon(icon);
+                }
+                string[] files = Directory.GetFiles(dpath);
+                foreach (string file in files)
+                {
+                    FenceItem icon = new FenceItem() { Filename = file };
+                    addicon(icon);
+                }
+            }
+        }
+
+        void addicon(FenceItem icon)
+        {
+            Button btn = new() { Margin = new Thickness(5), Style = (Style)Application.Current.Resources["asbsLight"], Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
+            StackPanel sp = new() { Margin = new Thickness(5) };
+            sp.Width = 60;
+            ContextMenu mn = new();
+            MenuItem miE = new() { Header = "Edit" };
+            MenuItem miM = new() { Header = "Move.." };
+            MenuItem miRemove = new() { Header = "Remove" };
+            miRemove.Click += (sender, e) =>
+            {
+                var items = geticons();
+                if (isLocked || items == null) return;
+                items.Remove(icon);
+                wpcont.Children.Remove(btn);
+                App.save();
+            };
+            mn.Items.Add(miE);
+            mn.Items.Add(miM);
+            mn.Items.Add(miRemove);
+            btn.ContextMenu = mn;
+            Image ico = new() { Width = 36, Height = 36, Margin = new Thickness(9) };
+            try
+            {
+                if (icon.DisplayIcon == "{AUTOICON}")
+                {
+                    if (Directory.Exists(icon.Filename)) //is it a folder?
+                    {
+                        ico.Source = new BitmapImage(new Uri("pack://application:,,,/folder-White.png"));
+                    }
+                    else
+                    {
+                        var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon(icon.Filename);
+                        if (extractedIcon != null)
+                        {
+                            ico.Source = extractedIcon.ToImageSource();
+                        }
+                    }
+                }
+                else
+                {
+                    ico.Source = new BitmapImage(new Uri(icon.DisplayIcon, UriKind.Relative));
+                }
+            }
+            catch
+            { }
+            sp.Children.Add(ico);
+            TextBlock lbl = new() { TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, HorizontalAlignment = HorizontalAlignment.Center, Foreground = Brushes.White };
+            lbl.MaxHeight = (lbl.FontSize * 1.5) + (lbl.Margin.Top * 2);
+            if (icon.DisplayName == "{AUTONAME}")
+            {
+                lbl.Text = Path.GetFileNameWithoutExtension(icon.Filename);
+            }
+            else
+            {
+                lbl.Text = icon.DisplayName;
+            }
+            sp.Children.Add(lbl);
+            miM.Click += (sender, e) => {
+                var items = geticons();
+                if (isLocked || items == null) return;
+                StackPanel cnt = new();
+                Window wwin = new() { Title = "Move " + icon.DisplayName, Content = cnt, Width = 300, Height = 100, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
+                ComboBox lv = new();
+                foreach (FenceItem icn in items)
+                {
+                    //StackPanel cc = new() { Orientation = Orientation.Horizontal};
+                    //cc.Children.Add(new Image() { Source = ico.Source });
+                    //cc.Children.Add(new Label() { Content = lbl.Text });
+                    lv.Items.Add(icn.Filename);
+                }
+                cnt.Children.Add(lv);
+                Button mbtn = new() { Content = "Move" };
+                cnt.Children.Add(mbtn);
+                mbtn.Click += (sender, e) => {
+                    if (lv.SelectedIndex == -1)
+                    {
+                        return;
+                    }
+                    int id = wpcont.Children.IndexOf(btn);
+                    FenceItem olddata = items[lv.SelectedIndex];
+                    items[lv.SelectedIndex] = items[id];
+                    items[id] = olddata;
+                    App.save();
+                    initcontent();
+                    wwin.Close();
+                };
+                wwin.ShowDialog();
+            };
+            miE.Click += (sender, e) => {
+                var items = geticons();
+                if (isLocked || items == null)
+                {
+                    return;
+                }
+
+
+                StackPanel cnt = new();
+                Window wwin = new() { Title = "Edit " + icon.Filename, Content = cnt, Width = 450, Height = 200, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
+                TextBox createsec(string name, string defaulval)
+                {
+                    DockPanel dpp = new();
+                    Label lbl = new() { Content = name };
+                    dpp.Children.Add(lbl);
+                    TextBox tbb = new() { Text = defaulval };
+                    dpp.Children.Add(tbb);
+                    cnt.Children.Add(dpp);
+                    return tbb;
+                }
+                ;
+                int id = wpcont.Children.IndexOf(btn);
+                TextBox tbDN = createsec("Display Name", items[id].DisplayName);
+                TextBox tbDI = createsec("Display Icon", items[id].DisplayIcon);
+                Button abtn = new() { Content = "Apply" };
+                abtn.Click += (sender, e) => {
+                    items[id].DisplayIcon = tbDI.Text;
+                    items[id].DisplayName = tbDN.Text;
+                    if (tbDN.Text == "{AUTONAME}")
+                    {
+
+                    }
+                    else
+                    {
+                        lbl.Text = tbDN.Text;
+                    }
+                    if (tbDI.Text == "{AUTOICON}")
+                    {
+
+                    }
+                    else
+                    {
+                        ico.Source = new BitmapImage(new Uri(tbDN.Text));
+                    }
+                    App.save();
+                    wwin.Close();
+                };
+                cnt.Children.Add(abtn);
+                wwin.ShowDialog();
+            };
+            var p = new Process();
+            p.StartInfo = new ProcessStartInfo(icon.Filename)
+            {
+                UseShellExecute = true
+            };
+            btn.Click += (sender, e) => {
+                try { p.Start(); } catch (Exception ex) { MessageBox.Show(ex.ToString(), "Error while launching", MessageBoxButton.OK, MessageBoxImage.Error); }
+            };
+            btn.Content = sp;
+            wpcont.Children.Add(btn);
+        }
+
+        public void applyFenceSettings()
+        {
+            win.ResizeMode = isLocked ? ResizeMode.NoResize : ResizeMode.CanResize;
+            win.Title = Title;
+            titlelabel.Content = Title;
+        }
+
+        public List<FenceItem>? geticons()
+        {
+            if (!(Items is List<FenceItem>) && ItemsType != "Data")
+            {
+                return null;
+            }
+            return Items as List<FenceItem>;
+        }
     }
 
-    class FenceItem
+    public class FenceItem
     {
         public string Filename = "";
         public string DisplayName = "{AUTONAME}";
