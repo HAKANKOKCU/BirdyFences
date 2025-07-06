@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Configuration;
@@ -18,7 +20,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shell;
 using System.Windows.Threading;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrayNotify;
+
 
 namespace Birdy_Fences
 {
@@ -28,7 +30,50 @@ namespace Birdy_Fences
     public partial class App : Application
     {
         public static string userdir = "";
-        public static List<Fence> fencedata = new();   
+        public static List<Fence> fencedata = new();
+
+        [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+        public static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes, out SHFileInfo psfi, uint cbFileInfo, uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DestroyIcon(IntPtr hIcon);
+
+        public const uint SHGFI_ICON = 0x000000100;
+        public const uint SHGFI_USEFILEATTRIBUTES = 0x000000010;
+        public const uint SHGFI_OPENICON = 0x000000002;
+        public const uint SHGFI_SMALLICON = 0x000000001;
+        public const uint SHGFI_LARGEICON = 0x000000000;
+        public const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
+        public const uint FILE_ATTRIBUTE_FILE = 0x00000100;
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        public struct SHFileInfo
+        {
+            public IntPtr hIcon;
+
+            public int iIcon;
+
+            public uint dwAttributes;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szDisplayName;
+
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
+            public string szTypeName;
+        };
+
+        public enum IconSize : short
+        {
+            Small,
+            Large
+        }
+
+        public enum ItemState : short
+        {
+            Undefined,
+            Open,
+            Close
+        }
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
@@ -38,7 +83,21 @@ namespace Birdy_Fences
             // fences.json exist but contains only []
             if (!File.Exists(userdir + "\\Birdy Fences\\fences.json") || File.ReadAllText(userdir + "\\Birdy Fences\\fences.json").Trim() == "[]")
             {
-                File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", "[{\"Title\":\"Welcome to BirdyFences\",\"X\":500,\"Y\":500,\"Width\":500,\"Height\":200,\"ItemsType\":\"Data\",\"isLocked\":false,\"Items\":[{\"Filename\":\"" + userdir.Replace("\\", "\\\\") + "\\\\Birdy Fences\\\\WELCOME.txt\"}]}]");
+                List<FenceItem> defconfItems = [
+                    new FenceItem() {
+                        Filename = userdir + "\\Birdy Fences\\WELCOME.txt",
+                        DisplayName = "Welcome!"
+                    }
+                ];
+                List<Fence> defconf =
+                [
+                    new Fence()
+                    {
+                        Title = "Welcome to BirdyFences!",
+                        Items = defconfItems
+                    },
+                ];
+                File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", JsonConvert.SerializeObject(defconf));
                 File.WriteAllText(userdir + "\\Birdy Fences\\WELCOME.txt", @"Welcome to Birdy Fences!
 
 This is a simple application that allows you to create fences on your desktop to organize your files and folders.
@@ -53,7 +112,7 @@ To edit title of the fence, double click on the title, then type the new title a
 Terminologies:
 Portal Fence - are files and shortcuts that exists on the selected portal folder");
             }
-            fencedata = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Fence>>(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json")) ?? new();
+            fencedata = JsonConvert.DeserializeObject<List<Fence>>(File.ReadAllText(userdir + "\\Birdy Fences\\fences.json")) ?? new();
             if (fencedata == null) fencedata = new();
             
             if (fencedata != null)
@@ -65,9 +124,43 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             }
         }
 
-        public static void save()
+        public static async void save()
         {
-            File.WriteAllText(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+            await File.WriteAllTextAsync(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+        }
+
+        public static BitmapSource GetIcon(string path, IconSize size, ItemState state)
+        {
+            var flags = (uint)(SHGFI_ICON | SHGFI_USEFILEATTRIBUTES);
+            var attribute = (uint)(FILE_ATTRIBUTE_FILE);
+
+            if (object.Equals(size, IconSize.Small))
+            {
+                flags += SHGFI_SMALLICON;
+            }
+            else
+            {
+                flags += SHGFI_LARGEICON;
+            }
+            var shfi = new SHFileInfo();
+            var res = SHGetFileInfo(path, attribute, out shfi, (uint)Marshal.SizeOf(shfi), flags);
+            if (object.Equals(res, IntPtr.Zero)) throw Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()) ?? new Exception();
+            try
+            {
+                var i = Imaging.CreateBitmapSourceFromHIcon(
+                            shfi.hIcon,
+                            Int32Rect.Empty,
+                            BitmapSizeOptions.FromEmptyOptions());
+                return i;
+            }
+            catch
+            {
+                throw;
+            }
+            finally
+            {
+                DestroyIcon(shfi.hIcon);
+            }
         }
     }
 
@@ -103,23 +196,23 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
         DockPanel dp = new();
         Border cborder = new() { CornerRadius = new CornerRadius(6) };
         ContextMenu cm = new();
-        MenuItem miNF = new() { Header = "New Fence" };
-        MenuItem miNP = new() { Header = "New Portal Fence" };
-        MenuItem miRF = new() { Header = "Remove Fence" };
-        MenuItem miC = new() { Header = "Color" };
-        MenuItem miLF = new() { Header = "Lock Fence", IsCheckable = true };
+        MenuItem miNewFence = new() { Header = "New Fence" };
+        MenuItem miNewPortal = new() { Header = "New Portal Fence" };
+        MenuItem miRemove = new() { Header = "Remove Fence" };
+        MenuItem miColor = new() { Header = "Color" };
+        MenuItem miLock = new() { Header = "Lock Fence", IsCheckable = true };
         Window win = new() { AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
         Label titlelabel = new() { Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)), Foreground = Brushes.White, HorizontalContentAlignment = HorizontalAlignment.Center };
         WrapPanel wpcont = new() { AllowDrop = true };
 
         public void init()
         {
-            cm.Items.Add(miNF);
-            cm.Items.Add(miNP);
-            cm.Items.Add(miRF);
+            cm.Items.Add(miNewFence);
+            cm.Items.Add(miNewPortal);
+            cm.Items.Add(miRemove);
             cm.Items.Add(new Separator());
-            cm.Items.Add(miC);
-            cm.Items.Add(miLF);
+            cm.Items.Add(miColor);
+            cm.Items.Add(miLock);
             HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
             win.Content = cborder;
             win.Width = Width;
@@ -129,22 +222,43 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             win.ContextMenu = cm;
             cborder.Child = dp;
 
-            cm.Opened += (e,s) => {
-                miLF.IsChecked = isLocked;
-                miRF.IsEnabled = !isLocked;
+
+            win.KeyDown += (s, e) => { 
+                if (e.Key == Key.System && e.SystemKey == Key.F4) // Use this to dedect alt+f4 because Closing would fire too on fence deletion.
+                {
+                    App.save();
+                    Application.Current.Shutdown();
+                }
             };
 
-            miLF.Click += (sender, e) =>
+            bool makefront = false;
+            win.Activated += (s, e) => {
+                if (makefront) //Ignore first one because it happens during init in a foreach.
+                {
+                    //Move to last so it creates last which makes it at front
+                    App.fencedata.Remove(this);
+                    App.fencedata.Add(this);
+                    App.save();
+                }
+                makefront = true;
+            };
+
+            cm.Opened += (e,s) => {
+                miLock.IsChecked = isLocked;
+                miRemove.IsEnabled = !isLocked;
+            };
+
+            miLock.Click += (sender, e) =>
             {
                 // Toggle fence lock: disables/enables resizing the fence
                 isLocked = !isLocked;
                 applyFenceSettings();
                 App.save();
             };
-            miC.Click += (s, e) => {
+            miColor.Click += (s, e) => {
                 // Color picker
                 StackPanel mcont = new();
-                Window win = new() { Title = "Choose color", ResizeMode = ResizeMode.NoResize, Width = 300, Height = 200, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = mcont };
+                Window win = new() { Title = "Choose color", ResizeMode = ResizeMode.NoResize, Width = 300, Height = 150, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = mcont };
                 Slider addslider(string name)
                 {
                     DockPanel cont = new();
@@ -191,7 +305,8 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
 
                 win.ShowDialog();
             };
-            miRF.Click += (sender, e) => {
+
+            miRemove.Click += (sender, e) => {
                 // Remove fence
                 if (!isLocked)
                 {
@@ -201,27 +316,28 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                     cm.Items.Refresh();
                 }
             };
-            miNF.Click += (sender, e) => {
+
+            miNewFence.Click += (sender, e) => {
+                // New fence
                 var fnc = new Fence();
                 App.fencedata.Add(fnc);
                 fnc.init();
                 App.save();
             };
-            miNP.Click += (sender, e) => {
+
+            miNewPortal.Click += (sender, e) => {
                 // New portal fence
-                using var dialog = new System.Windows.Forms.FolderBrowserDialog
+                var dialog = new OpenFolderDialog
                 {
-                    Description = "Select folder for portal",
-                    UseDescriptionForTitle = true,
-                    ShowNewFolderButton = true
+                    Title = "Select folder for portal"
                 };
                 
-                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                if (dialog.ShowDialog() == true)
                 {
                     var fnc = new Fence()
                     {
                         ItemsType = "Portal",
-                        Items = dialog.SelectedPath
+                        Items = dialog.FolderName
                     };
                     App.fencedata.Add(fnc);
                     fnc.init();
@@ -283,6 +399,7 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             DockPanel.SetDock(titlelabel, Dock.Top);
             DockPanel.SetDock(titletb, Dock.Top);
             
+            // Dropping (To add icons)
             win.DragOver += (object sender, DragEventArgs e) => {
                 e.Effects = DragDropEffects.Copy | DragDropEffects.Move;
                 //e.Handled = true;
@@ -376,14 +493,15 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             sp.Width = 60;
             ContextMenu mn = new();
 
-            MenuItem miE = new() { Header = "Edit" };
-            MenuItem miM = new() { Header = "Move.." };
+            MenuItem miEdit = new() { Header = "Edit" };
+            MenuItem miMove = new() { Header = "Swap with..." };
             MenuItem miRemove = new() { Header = "Remove" };
 
             mn.Opened += (e, s) => {
-                miE.IsEnabled = !isLocked;
-                miM.IsEnabled = !isLocked;
-                miRemove.IsEnabled = !isLocked;
+                var geticonsstatus = geticons() != null;
+                miEdit.IsEnabled = !isLocked && geticonsstatus;
+                miMove.IsEnabled = !isLocked && geticonsstatus;
+                miRemove.IsEnabled = !isLocked && geticonsstatus;
             };
 
             miRemove.Click += (sender, e) =>
@@ -395,8 +513,8 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                 App.save();
             };
 
-            mn.Items.Add(miE);
-            mn.Items.Add(miM);
+            mn.Items.Add(miEdit);
+            mn.Items.Add(miMove);
             mn.Items.Add(miRemove);
             btn.ContextMenu = mn;
             Image ico = new() { Width = 36, Height = 36, Margin = new Thickness(9) };
@@ -406,14 +524,7 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             lbl.MaxHeight = (lbl.FontSize * 1.5) + (lbl.Margin.Top * 2);
             void updateNameAndIcon()
             {
-                if (icon.DisplayName == "{AUTONAME}")
-                {
-                    lbl.Text = Path.GetFileNameWithoutExtension(icon.Filename);
-                }
-                else
-                {
-                    lbl.Text = icon.DisplayName;
-                }
+                lbl.Text = icon.getDisplayName();
                 try
                 {
                     if (icon.DisplayIcon == "{AUTOICON}")
@@ -424,11 +535,8 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                         }
                         else
                         {
-                            var extractedIcon = System.Drawing.Icon.ExtractAssociatedIcon(icon.Filename);
-                            if (extractedIcon != null)
-                            {
-                                ico.Source = extractedIcon.ToImageSource();
-                            }
+                            var extractedIcon = App.GetIcon(icon.Filename, App.IconSize.Large, App.ItemState.Undefined);
+                            ico.Source = extractedIcon;
                         }
                     }
                     else
@@ -441,18 +549,18 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             }
             updateNameAndIcon();
             sp.Children.Add(lbl);
-            miM.Click += (sender, e) => {
+            miMove.Click += (sender, e) => {
                 var items = geticons();
                 if (isLocked || items == null) return;
                 StackPanel cnt = new();
-                Window wwin = new() { Title = "Move " + icon.DisplayName, Content = cnt, Width = 300, Height = 100, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
+                Window wwin = new() { Title = "Move " + icon.getDisplayName(), Content = cnt, Width = 300, Height = 80, WindowStartupLocation = WindowStartupLocation.CenterScreen, ResizeMode = ResizeMode.NoResize };
                 ComboBox lv = new();
                 foreach (FenceItem icn in items)
                 {
                     //StackPanel cc = new() { Orientation = Orientation.Horizontal};
                     //cc.Children.Add(new Image() { Source = ico.Source });
                     //cc.Children.Add(new Label() { Content = lbl.Text });
-                    lv.Items.Add(icn.Filename);
+                    lv.Items.Add(icn.getDisplayName());
                 }
                 cnt.Children.Add(lv);
                 Button mbtn = new() { Content = "Move" };
@@ -472,7 +580,7 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                 };
                 wwin.ShowDialog();
             };
-            miE.Click += (sender, e) => {
+            miEdit.Click += (sender, e) => {
                 var items = geticons();
                 if (isLocked || items == null)
                 {
@@ -542,30 +650,17 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
         public string Filename = "";
         public string DisplayName = "{AUTONAME}";
         public string DisplayIcon = "{AUTOICON}";
-    }
 
-    internal static class IconUtilities
-    {
-        [DllImport("gdi32.dll", SetLastError = true)]
-        private static extern bool DeleteObject(IntPtr hObject);
-
-        public static ImageSource ToImageSource(this System.Drawing.Icon icon)
+        public string getDisplayName()
         {
-            System.Drawing.Bitmap bitmap = icon.ToBitmap();
-            IntPtr hBitmap = bitmap.GetHbitmap();
-
-            ImageSource wpfBitmap = Imaging.CreateBitmapSourceFromHBitmap(
-                hBitmap,
-                IntPtr.Zero,
-                Int32Rect.Empty,
-                BitmapSizeOptions.FromEmptyOptions());
-
-            if (!DeleteObject(hBitmap))
+            if (DisplayName == "{AUTONAME}")
             {
-                throw new Win32Exception("Couldn't delete the bitmap object!");
+                return Path.GetFileNameWithoutExtension(Filename);
             }
-
-            return wpfBitmap;
+            else
+            {
+                return DisplayName;
+            }
         }
     }
 

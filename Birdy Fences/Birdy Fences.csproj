@@ -6,7 +6,7 @@
     <RootNamespace>Birdy_Fences</RootNamespace>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>True</UseWindowsForms>
+    <UseWindowsForms>False</UseWindowsForms>
     <ApplicationIcon>Resources\favicon.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
   </PropertyGroup>
