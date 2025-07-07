@@ -144,7 +144,7 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             }
             var shfi = new SHFileInfo();
             var res = SHGetFileInfo(path, attribute, out shfi, (uint)Marshal.SizeOf(shfi), flags);
-            if (object.Equals(res, IntPtr.Zero)) throw Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()) ?? new Exception();
+            if (object.Equals(res, IntPtr.Zero)) throw Marshal.GetExceptionForHR(Marshal.GetHRForLastWin32Error()) ?? new Exception("Unknown exception occurred!");
             try
             {
                 var i = Imaging.CreateBitmapSourceFromHIcon(
@@ -354,7 +354,8 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                 // New portal fence
                 var dialog = new OpenFolderDialog
                 {
-                    Title = "Select folder for portal"
+                    Title = "Select folder for portal",
+                    ValidateNames = true,
                 };
                 
                 if (dialog.ShowDialog() == true)
@@ -362,7 +363,8 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                     var fnc = new Fence()
                     {
                         ItemsType = "Portal",
-                        Items = dialog.FolderName
+                        Items = dialog.FolderName,
+                        Title = Path.GetFileNameWithoutExtension(dialog.FolderName)
                     };
                     App.fencedata.Add(fnc);
                     fnc.init();
@@ -440,8 +442,8 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                                 continue;
                             }
 
-                            bool snapx = Math.Round(f.X / 10) == Math.Round(newx / 10);
-                            bool snapy = Math.Round(f.Y / 10) == Math.Round(newy / 10);
+                            bool snapx = Math.Floor(f.X / 10) == Math.Floor(newx / 10);
+                            bool snapy = Math.Floor(f.Y / 10) == Math.Floor(newy / 10);
                             if (snapx)
                             {
                                 newx = f.X;
@@ -549,18 +551,26 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             else if (ItemsType == "Portal")
             {
                 string dpath = (string)Items;
-                string[] dirs = Directory.GetDirectories(dpath);
-                foreach (string dir in dirs)
+                try
                 {
-                    FenceItem icon = new FenceItem() { Filename = dir };
-                    addicon(icon);
-                }
-                string[] files = Directory.GetFiles(dpath);
-                foreach (string file in files)
+                    string[] dirs = Directory.GetDirectories(dpath);
+                    foreach (string dir in dirs)
+                    {
+                        if (Path.GetFileName(dir).StartsWith(".")) continue;
+                        FenceItem icon = new FenceItem() { Filename = dir };
+                        addicon(icon);
+                    }
+                    string[] files = Directory.GetFiles(dpath);
+                    foreach (string file in files)
+                    {
+                        if (Path.GetFileName(file).ToLower() == "desktop.ini") continue;
+                        if (Path.GetFileName(file).StartsWith(".")) continue;
+                        FenceItem icon = new FenceItem() { Filename = file };
+                        addicon(icon);
+                    }
+                }catch //(Exception e) TODO: maybe add a indicator, messagebox will crash it rn
                 {
-                    if (Path.GetFileName(file).ToLower() == "desktop.ini") continue;
-                    FenceItem icon = new FenceItem() { Filename = file };
-                    addicon(icon);
+                    //MessageBox.Show(e.ToString(), "Couldn't load fence", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
