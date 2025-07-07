@@ -126,7 +126,7 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
 
         public static async void save()
         {
-            await File.WriteAllTextAsync(userdir + "\\Birdy Fences\\fences.json", Newtonsoft.Json.JsonConvert.SerializeObject(fencedata));
+            await File.WriteAllTextAsync(userdir + "\\Birdy Fences\\fences.json", JsonConvert.SerializeObject(fencedata));
         }
 
         public static BitmapSource GetIcon(string path, IconSize size, ItemState state)
@@ -202,25 +202,50 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
         MenuItem miColor = new() { Header = "Color" };
         MenuItem miLock = new() { Header = "Lock Fence", IsCheckable = true };
         Window win = new() { AllowDrop = true, AllowsTransparency = true, Background = Brushes.Transparent, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
-        Label titlelabel = new() { Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)), Foreground = Brushes.White, HorizontalContentAlignment = HorizontalAlignment.Center };
+        Border titleborder = new() { Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)), CornerRadius = new CornerRadius(6) };
+        DockPanel titlecont = new();
+        Label titlelabel = new() { Foreground = Brushes.White, HorizontalContentAlignment = HorizontalAlignment.Center };
+        TextBox titletb = new() { HorizontalContentAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed, Background = Brushes.Transparent, Foreground = Brushes.White, Padding = new Thickness(4) };
         WrapPanel wpcont = new() { AllowDrop = true };
+        ScrollViewer wpcontscr = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
         public void init()
         {
+            bool dragging = false;
+            Point? lastmousepos = null;
+
+            //Menu
             cm.Items.Add(miNewFence);
             cm.Items.Add(miNewPortal);
             cm.Items.Add(miRemove);
             cm.Items.Add(new Separator());
             cm.Items.Add(miColor);
             cm.Items.Add(miLock);
+
+            // Title stuff
+            Grid namecont = new();
+            namecont.Children.Add(titlelabel);
+            namecont.Children.Add(titletb);
+            titlecont.Children.Add(namecont);
+            dp.Children.Add(titleborder);
+            dp.Children.Add(wpcontscr);
+
+            // Window stuff
             HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
-            win.Content = cborder;
+            WindowChrome.SetWindowChrome(win, new WindowChrome() { CaptionHeight = 0, ResizeBorderThickness = new Thickness(5) });
+            DockPanel.SetDock(titleborder, Dock.Top);
+
+            // Other argument stuff
             win.Width = Width;
             win.Height = Height;
             win.Top = Y;
             win.Left = X;
+
+            win.Content = cborder;
             win.ContextMenu = cm;
             cborder.Child = dp;
+            titleborder.Child = titlecont;
+            wpcontscr.Content = wpcont;
 
 
             win.KeyDown += (s, e) => { 
@@ -344,18 +369,15 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                     App.save();
                 }
             };
-            WindowChrome.SetWindowChrome(win, new WindowChrome() { CaptionHeight = 0, ResizeBorderThickness = new Thickness(5) });
 
-            titlelabel.Content = Title;
-            dp.Children.Add(titlelabel);
-            TextBox titletb = new() { HorizontalContentAlignment = HorizontalAlignment.Center, Visibility = Visibility.Collapsed };
-            dp.Children.Add(titletb);
             titlelabel.MouseDown += (object sender, MouseButtonEventArgs e) => {
                 if (e.ClickCount == 1)
                 {
-                    if (e.LeftButton == MouseButtonState.Pressed && !isLocked)
+                    if (e.LeftButton == MouseButtonState.Pressed)
                     {
-                        win.DragMove();
+                        //win.DragMove();
+                        dragging = true;
+                        win.CaptureMouse();
                     }
                 }
                 else
@@ -384,11 +406,72 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                     titletb.Visibility = Visibility.Collapsed;
                 }
             };
-            titlelabel.MouseUp += (object sender, MouseButtonEventArgs e) => {
-                Y = win.Top;
-                X = win.Left;
-                App.save();
+            win.MouseUp += (object sender, MouseButtonEventArgs e) => {
+                if (dragging)
+                {
+                    dragging = false;
+                    lastmousepos = null;
+                    win.ReleaseMouseCapture();
+                    Y = win.Top;
+                    X = win.Left;
+                    App.save();
+                }
             };
+
+
+            
+            win.MouseMove += (object sender, MouseEventArgs e) => {
+                if (dragging && !isLocked)
+                {
+                    Point pos = win.PointToScreen(e.GetPosition(win));
+                    if (lastmousepos != null)
+                    {
+                        var lastpos = (Point)lastmousepos;
+                        double diffx = pos.X - lastpos.X;
+                        double diffy = pos.Y - lastpos.Y;
+                        double newx = win.Left + diffx;
+                        double newy = win.Top + diffy;
+                        bool snappedX = false;
+                        bool snappedY = false;
+                        foreach (Fence f in App.fencedata)
+                        {
+                            if (f == this)
+                            {
+                                continue;
+                            }
+
+                            bool snapx = Math.Round(f.X / 10) == Math.Round(newx / 10);
+                            bool snapy = Math.Round(f.Y / 10) == Math.Round(newy / 10);
+                            if (snapx)
+                            {
+                                newx = f.X;
+                                snappedX = true;
+                            }
+                            if (snapy)
+                            {
+                                newy = f.Y;
+                                snappedY = true;
+                            }
+                        }
+                        if (!snappedX && !snappedY)
+                        {
+                            lastmousepos = pos;
+                        }else if (snappedX)
+                        {
+                            lastmousepos = new Point(lastpos.X, pos.Y);
+                        }
+                        else if (snappedY)
+                        {
+                            lastmousepos = new Point(pos.X, lastpos.Y);
+                        }
+                        win.Top = newy;
+                        win.Left = newx;
+                    }else
+                        lastmousepos = pos;
+                }
+                
+            };
+
             win.SizeChanged += (sender, e) => {
                 Width = win.ActualWidth;
                 Height = win.ActualHeight;
@@ -396,8 +479,6 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                 X = win.Left;
                 App.save();
             };
-            DockPanel.SetDock(titlelabel, Dock.Top);
-            DockPanel.SetDock(titletb, Dock.Top);
             
             // Dropping (To add icons)
             win.DragOver += (object sender, DragEventArgs e) => {
@@ -443,8 +524,6 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
 
 
             initcontent();
-            ScrollViewer wpcontscr = new() { Content = wpcont, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            dp.Children.Add(wpcontscr);
             win.Show();
             win.Loaded += (sender, e) => SetWindowLong(new WindowInteropHelper(win).Handle, GWL_HWNDPARENT, hprog);
 
