@@ -176,6 +176,9 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
         [DllImport("user32.dll", SetLastError = true)]
         static extern IntPtr FindWindowEx(IntPtr parentHandle, IntPtr childAfter, string className, string windowTitle);
 
+        private const int WM_ENTERSIZEMOVE = 0x0231;
+        private const int WM_EXITSIZEMOVE = 0x0232;
+
         IntPtr hprog = FindWindowEx(
             FindWindowEx(
                 FindWindow("Progman", "Program Manager"),
@@ -234,6 +237,12 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             HideAltTab.VirtualDesktopHelper.MakeWindowPersistent(win);
             WindowChrome.SetWindowChrome(win, new WindowChrome() { CaptionHeight = 0, ResizeBorderThickness = new Thickness(5) });
             DockPanel.SetDock(titleborder, Dock.Top);
+            win.Loaded += (obj, args) =>
+            {
+                var handle = new WindowInteropHelper(win).Handle;
+                var winhwnd = HwndSource.FromHwnd(handle);
+                winhwnd.AddHook(new HwndSourceHook(WndProc));
+            };
 
             // Other argument stuff
             win.Width = Width;
@@ -280,6 +289,7 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                 applyFenceSettings();
                 App.save();
             };
+
             miColor.Click += (s, e) => {
                 // Color picker
                 StackPanel mcont = new();
@@ -307,28 +317,25 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                 redslider.ValueChanged += (s, e) => {
                     fencecolor[1] = (byte)redslider.Value;
                     applyFenceSettings();
-                    App.save();
                 };
 
                 greenslider.ValueChanged += (s, e) => {
                     fencecolor[2] = (byte)greenslider.Value;
                     applyFenceSettings();
-                    App.save();
                 };
 
                 blueslider.ValueChanged += (s, e) => {
                     fencecolor[3] = (byte)blueslider.Value;
                     applyFenceSettings();
-                    App.save();
                 };
 
                 alphaslider.ValueChanged += (s, e) => {
                     fencecolor[0] = (byte)alphaslider.Value;
                     applyFenceSettings();
-                    App.save();
                 };
 
                 win.ShowDialog();
+                App.save();
             };
 
             miRemove.Click += (sender, e) => {
@@ -472,14 +479,6 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
                         lastmousepos = pos;
                 }
                 
-            };
-
-            win.SizeChanged += (sender, e) => {
-                Width = win.ActualWidth;
-                Height = win.ActualHeight;
-                Y = win.Top;
-                X = win.Left;
-                App.save();
             };
             
             // Dropping (To add icons)
@@ -714,6 +713,20 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
             };
             btn.Content = sp;
             wpcont.Children.Add(btn);
+        }
+
+        IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) // To handle resize end event
+        {
+            if (msg == WM_EXITSIZEMOVE)
+            {
+                Width = win.ActualWidth;
+                Height = win.ActualHeight;
+                Y = win.Top;
+                X = win.Left;
+                App.save();
+                handled = true;
+            }
+            return IntPtr.Zero;
         }
 
         public void applyFenceSettings()
