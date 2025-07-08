@@ -333,7 +333,7 @@ Portal Fence - are files and shortcuts that exists on the selected portal folder
 
             miRemove.Click += (sender, e) => {
                 // Remove fence
-                if (!isLocked)
+                if (!isLocked && MessageBox.Show("Do you really want to delete this fence?", "Delete fence?", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
                 {
                     App.fencedata.Remove(this);
                     win.Close();
