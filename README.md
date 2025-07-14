@@ -6,6 +6,10 @@ BirdyFences is alternative to the StarDock's Fences
 
 ![resim](https://github.com/user-attachments/assets/f6e8497d-b266-499a-b92b-2e62e5319b64)
 
+# Install
+* [Click here for all releases](https://github.com/HAKANKOKCU/BirdyFences/releases)
+* You can also compile it yourself with Dotnet 9 SDK if you want.
+
 # How to
 Just open the exe to get started.
 
