@@ -2,24 +2,21 @@
 ![birdyfences_sm](https://github.com/user-attachments/assets/ac577965-9f2f-483a-9bfd-4281b199ec73)
 Thanks to Lycol50 for the icon
 
-BirdyFences is alternative to the StarDock's Fences
+BirdyFences is a alternative to the StarDock's Fences.
 
 ![resim](https://github.com/user-attachments/assets/f6e8497d-b266-499a-b92b-2e62e5319b64)
 
 # Install
 * [Click here for all releases](https://github.com/HAKANKOKCU/BirdyFences/releases)
-* You can also compile it yourself with Dotnet 9 SDK if you want.
+* You can also compile it yourself with .NET 9 SDK if you want.
 
 # How to
-Just open the exe to get started.
+Just install/open the executable to get started.
 
 - To create a new fence, right click on the Title of a fence, then `New Fence`
 - To remove a fence, right click in the Title of the fence, then `Remove Fence`
 - To create a Portal Fence, right click in the Title of a fence then `New Portal Fence`, and select a folder to portal it.
-- To Lock/Unlock a fence, right click on the Title of the fence, then `Lock Fence`
-```
-Note: If you lock a fence, you cannot move the fences, edit the title, remove fences, and even modify the shortcuts inside the fence.
-```
+- To Lock/Unlock a fence, right click on the Title of the fence, then `Lock Fence`, Which makes fence not moveable or editable.
 - To edit title of the fence, double click on the title, then type the new title and press Enter, or ESC to undo.
 
 # To automatically start when boot
