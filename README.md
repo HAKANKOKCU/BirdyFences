@@ -23,7 +23,7 @@ Just install/open the executable to get started.
 ## shell:startup
 - Windows 11: Right Click into the exe file then `Show more options` then `Send to` and click `Desktop (Create Shortcut)`
 - Windows 10: Right Click into the exe file then `Send to` and click `Desktop (Create Shortcut)`
-- Do `CTRL+R` then type `shell:startup`
+- Do `Win+R` then type `shell:startup`
 - Drag the `Birdy Fences - Shortcut` to the shell:startup file explorer
 - And reboot to check if its working.
 ## Task scheduler
